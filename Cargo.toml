@@ -1,0 +1,28 @@
+[package]
+name = "ghostteam"
+version = "0.1.0"
+edition = "2024"
+authors = ["James D. Ingersoll"]
+description = "GhostTeam by GodsIMiJ AI Solutions Inc."
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+env_logger = "0.11"
+log = "0.4"
+reqwest = { version = "0.12", features = ["json", "blocking", "rustls-tls"] }
+rusqlite = { version = "0.32", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+
+[dev-dependencies]
+criterion = "0.5"
+
+[[bench]]
+name = "agent_bench"
+harness = false
+
+[[bench]]
+name = "db_bench"
+harness = false

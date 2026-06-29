@@ -1,0 +1,54 @@
+name: GhostTeam Release - GodsIMiJ AI Solutions Inc.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: GodsIMiJ build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            bin_name: ghostteam
+            artifact_file: ghostteam-linux-x86_64
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            bin_name: ghostteam
+            artifact_file: ghostteam-macos-x86_64
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            bin_name: ghostteam.exe
+            artifact_file: ghostteam-windows-x86_64.exe
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          target: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --release --target ${{ matrix.target }}
+        working-directory: ghostteam
+
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp "target/${{ matrix.target }}/release/${{ matrix.bin_name }}" "dist/${{ matrix.artifact_file }}"
+        working-directory: ghostteam
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_file }}
+          path: ghostteam/dist/${{ matrix.artifact_file }}

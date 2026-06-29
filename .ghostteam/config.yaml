@@ -1,0 +1,2 @@
+ghostos_endpoint: "http://localhost:9000/infer"
+ghostos_model: "ghost-1"

@@ -1,0 +1,6 @@
+name: default
+description: TODO
+roles:
+  - manager
+  - worker
+  - inspector
