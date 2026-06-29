@@ -2,6 +2,8 @@
 
 GhostTeam is built by GodsIMiJ AI Solutions Inc. and architected by James D. Ingersoll.
 
+License: [MIT](LICENSE)
+
 GhostTeam is a local-first multi-agent coordination playground written in Rust. It keeps a small SQLite-backed workspace on disk, lets agents join under a role and backend, routes messages between agents, and tracks task handoffs through a simple command-line interface.
 
 ## Overview
