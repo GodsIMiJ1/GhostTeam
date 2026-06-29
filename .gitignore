@@ -1,0 +1,24 @@
+# Rust build output
+target/
+
+# Local tooling and editor state
+.vscode/
+.idea/
+.fleet/
+.history/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and temporary files
+*.log
+*.tmp
+*.swp
+*.swo
+
+# Local environment overrides
+.env
+.env.local
+.env.*
+!.env.example
