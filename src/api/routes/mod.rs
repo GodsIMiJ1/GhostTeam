@@ -1,3 +1,4 @@
+pub mod dashboard;
 pub mod agents;
 pub mod ghostos;
 pub mod logs;

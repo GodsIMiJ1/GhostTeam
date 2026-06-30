@@ -19,13 +19,16 @@ pub enum ApiServerError {
 }
 
 pub fn build_router() -> Router {
-    Router::new()
+    let public_router = Router::new().merge(routes::dashboard::router());
+    let api_router = Router::new()
         .nest("/agents", routes::agents::router())
         .nest("/tasks", routes::tasks::router())
         .nest("/messages", routes::messages::router())
         .nest("/logs", routes::logs::router())
         .nest("/ghostos", routes::ghostos::router())
-        .layer(middleware::from_fn(auth::require_api_key))
+        .layer(middleware::from_fn(auth::require_api_key));
+
+    public_router.merge(api_router)
 }
 
 pub async fn start_api_server(port: u16) -> Result<(), ApiServerError> {

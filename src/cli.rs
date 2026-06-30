@@ -91,6 +91,7 @@ pub enum Commands {
         output: Option<PathBuf>,
     },
     Bench,
+    Dashboard,
     ApiDocs,
 }
 
@@ -313,6 +314,13 @@ pub fn run(cli: Cli) -> Result<()> {
             if !status.success() {
                 anyhow::bail!("cargo bench failed with status {status}");
             }
+        }
+        Commands::Dashboard => {
+            let port = env::var("GHOSTTEAM_API_PORT")
+                .ok()
+                .and_then(|value| value.parse::<u16>().ok())
+                .unwrap_or(3000);
+            println!("http://localhost:{port}/");
         }
         Commands::ApiDocs => {
             let path = env::current_dir()?.join("openapi.yaml");

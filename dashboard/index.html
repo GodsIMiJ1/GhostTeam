@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GhostTeam Dashboard</title>
+    <meta
+      name="description"
+      content="Standalone operator dashboard for GhostTeam, with agents, tasks, messages, GhostOS, and logs."
+    />
+    <link rel="icon" type="image/svg+xml" href="/dashboard.svg" />
+    <link rel="stylesheet" href="/dashboard.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+    <div class="ambient ambient-three"></div>
+
+    <main class="shell">
+      <header class="hero card">
+        <div class="hero-brand">
+          <img class="hero-logo" src="/dashboard.svg" alt="" />
+          <div>
+            <p class="eyebrow">GhostTeam</p>
+            <h1>Standalone Dashboard</h1>
+            <p class="hero-copy">
+              Operate agents, task flow, inboxes, GhostOS inference, and live logs from one local console.
+            </p>
+          </div>
+        </div>
+
+        <div class="hero-status">
+          <div>
+            <span class="status-label">Connection</span>
+            <strong id="connectionStatus">Disconnected</strong>
+          </div>
+          <div>
+            <span class="status-label">Workspace</span>
+            <strong>.ghostteam</strong>
+          </div>
+          <div>
+            <span class="status-label">Last refresh</span>
+            <strong id="lastRefresh">Never</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="metrics-grid">
+        <article class="metric card">
+          <span class="metric-label">Agents</span>
+          <strong id="metricAgents">0</strong>
+          <small>Registered participants</small>
+        </article>
+        <article class="metric card">
+          <span class="metric-label">Tasks</span>
+          <strong id="metricTasks">0</strong>
+          <small>Tracked assignments</small>
+        </article>
+        <article class="metric card">
+          <span class="metric-label">Unread</span>
+          <strong id="metricUnread">0</strong>
+          <small>Messages waiting</small>
+        </article>
+        <article class="metric card">
+          <span class="metric-label">Logs</span>
+          <strong id="metricLogs">Idle</strong>
+          <small>Live tail status</small>
+        </article>
+      </section>
+
+      <section class="charts-grid">
+        <article class="card panel chart-card">
+          <div class="panel-header">
+            <h2>Task Status</h2>
+            <p>Current mix of created, acked, completed, and requeued work.</p>
+          </div>
+          <div id="taskStatusChart" class="chart-slot"></div>
+        </article>
+
+        <article class="card panel chart-card">
+          <div class="panel-header">
+            <h2>Assignment Load</h2>
+            <p>Who is carrying the active task load right now.</p>
+          </div>
+          <div id="taskLoadChart" class="chart-slot"></div>
+        </article>
+
+        <article class="card panel chart-card">
+          <div class="panel-header">
+            <h2>Inbox Sources</h2>
+            <p>Where unread messages are coming from.</p>
+          </div>
+          <div id="messageSourceChart" class="chart-slot"></div>
+        </article>
+      </section>
+
+      <section class="card panel filter-bar">
+        <div class="panel-header split">
+          <div>
+            <h2>Active Filters</h2>
+            <p>Click a chart bar to filter the workspace, or clear everything here.</p>
+          </div>
+          <button id="clearChartFilters" class="secondary" type="button">Clear filters</button>
+        </div>
+        <div id="activeFilters" class="filter-chips"></div>
+      </section>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Connection</h2>
+              <p>Point the dashboard at any GhostTeam API instance.</p>
+            </div>
+
+            <form id="settingsForm" class="form-stack">
+              <label>
+                <span>API URL</span>
+                <input id="apiUrl" type="url" spellcheck="false" />
+              </label>
+              <label>
+                <span>API Key</span>
+                <input id="apiKey" type="password" spellcheck="false" placeholder="X-GhostTeam-Key" />
+              </label>
+              <label>
+                <span>Focus agent</span>
+                <select id="focusAgent"></select>
+              </label>
+              <label class="inline-field">
+                <input id="autoRefresh" type="checkbox" />
+                <span>Auto refresh every 10 seconds</span>
+              </label>
+              <div class="button-row">
+                <button class="primary" type="submit">Save</button>
+                <button id="refreshNow" class="secondary" type="button">Refresh now</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Join Agent</h2>
+              <p>Register a new agent identity in the local workspace.</p>
+            </div>
+
+            <form id="joinForm" class="form-stack">
+              <label>
+                <span>Agent ID</span>
+                <input id="joinId" type="text" placeholder="worker" />
+              </label>
+              <label>
+                <span>Role</span>
+                <input id="joinRole" type="text" placeholder="worker" />
+              </label>
+              <label>
+                <span>Backend</span>
+                <input id="joinBackend" type="text" placeholder="ollama" />
+              </label>
+              <button class="primary" type="submit">Join</button>
+            </form>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Agent Detail</h2>
+              <p>Use the current focus agent or pick a different entry below.</p>
+            </div>
+            <div id="agentDetail" class="detail-empty">Select an agent to inspect its profile.</div>
+          </section>
+        </aside>
+
+        <section class="content">
+          <section class="card panel">
+            <div class="panel-header split">
+              <div>
+                <h2>Agents</h2>
+                <p>Registered agents and their backends.</p>
+              </div>
+              <button id="leaveSelected" class="secondary" type="button">Leave selected</button>
+            </div>
+            <div id="agentsList" class="stack-list"></div>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Messages</h2>
+              <p>Unread inbox for the focus agent, plus a quick send form.</p>
+            </div>
+            <form id="messageForm" class="inline-form">
+              <input id="messageFrom" type="text" placeholder="from" />
+              <input id="messageTo" type="text" placeholder="to" />
+              <input id="messageBody" type="text" placeholder="message body" />
+              <button class="primary" type="submit">Send</button>
+            </form>
+            <div id="messagesList" class="stack-list"></div>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Tasks</h2>
+              <p>Create, acknowledge, complete, or requeue tasks.</p>
+            </div>
+            <form id="taskForm" class="grid-form">
+              <input id="taskFrom" type="text" placeholder="from" />
+              <input id="taskTo" type="text" placeholder="to" />
+              <input id="taskDescription" type="text" placeholder="task description" />
+              <button class="primary" type="submit">Create</button>
+            </form>
+            <div class="task-actions">
+              <input id="taskIdAction" type="number" min="1" placeholder="task id" />
+              <input id="taskWorker" type="text" placeholder="worker" />
+              <input id="taskResult" type="text" placeholder="result" />
+              <button id="ackTask" class="secondary" type="button">Ack</button>
+              <button id="completeTask" class="secondary" type="button">Complete</button>
+              <button id="requeueTask" class="secondary" type="button">Requeue</button>
+            </div>
+            <div id="tasksList" class="stack-list"></div>
+            <div class="detail-panel">
+              <div class="panel-header split">
+                <div>
+                  <h3>Task detail</h3>
+                  <p id="taskInspectorSummary">Select a task to inspect history and transitions.</p>
+                </div>
+                <div class="button-row task-detail-actions">
+                  <button id="refreshTaskDetail" class="secondary" type="button">Refresh task</button>
+                  <button id="copyTaskJson" class="secondary" type="button">Copy JSON</button>
+                </div>
+              </div>
+              <div class="task-inspector-grid">
+                <div>
+                  <div id="taskSnapshot" class="detail-empty">Select a task to inspect details.</div>
+                </div>
+                <div>
+                  <div id="taskTimeline" class="stack-list"></div>
+                </div>
+              </div>
+              <pre id="taskRaw" class="code-block">Select a task to inspect raw JSON.</pre>
+            </div>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>GhostOS Infer</h2>
+              <p>Send a prompt to the GhostOS passthrough and inspect the result.</p>
+            </div>
+            <form id="ghostosForm" class="form-stack">
+              <label>
+                <span>Prompt</span>
+                <textarea id="ghostosPrompt" rows="5" placeholder="Draft a coordination note, analysis, or task summary..."></textarea>
+              </label>
+              <button class="primary" type="submit">Infer</button>
+            </form>
+            <pre id="ghostosOutput" class="code-block">No GhostOS response yet.</pre>
+          </section>
+
+          <section class="card panel">
+            <div class="panel-header">
+              <h2>Logs</h2>
+              <p>Live stream for the selected agent.</p>
+            </div>
+            <div class="inline-form">
+              <select id="logAgent"></select>
+              <button id="clearLogs" class="secondary" type="button">Clear</button>
+            </div>
+            <pre id="logOutput" class="log-stream">Select an agent to begin tailing logs.</pre>
+          </section>
+        </section>
+      </section>
+    </main>
+
+    <script src="/dashboard.js"></script>
+  </body>
+</html>

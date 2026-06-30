@@ -5,6 +5,7 @@ WORKDIR /app
 
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
+COPY dashboard ./dashboard
 COPY schema.sql ./
 COPY .ghostteam ./.ghostteam
 

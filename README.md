@@ -8,6 +8,8 @@ GhostTeam is a local-first multi-agent coordination playground written in Rust. 
 
 It can also mirror agents, messages, and task handoffs into KasperKonnect automatically when the daemon is running locally, or explicitly when you set `GHOSTTEAM_KASPERKONNECT_URL=http://127.0.0.1:4077`.
 
+It also ships with a dedicated dashboard that opens at `/` when the API server is running.
+
 ## Overview
 
 GhostTeam is built around three core ideas:
@@ -96,6 +98,8 @@ docker compose up --build ghostteam-api
 
 This starts the API server and mounts a persistent GhostTeam workspace volume.
 
+Open `http://localhost:8080/` to use the dashboard in your browser.
+
 You can override deployment settings with environment variables or a `.env` file:
 
 - `GHOSTTEAM_API_PORT` defaults to `8080`
@@ -145,6 +149,8 @@ docker compose up --build ghostos-real
 The `ghostos-real` container installs the official `ghostos` package and launches its web runtime. If you want GhostTeam to talk to another GhostOS deployment directly, point `GHOSTTEAM_GHOSTOS_ENDPOINT` at a compatible `/infer` adapter for that deployment.
 
 When running in Docker, the API listens on `8080` by default, so the OpenAPI and client base URLs should point to `http://localhost:8080`.
+
+The dashboard is served from the same origin, so it can reuse the API key you enter in the connection panel without any extra CORS setup.
 
 The GhostOS config inside the container is read from `.ghostteam/config.yaml`, but the Docker image and compose stack also honor `GHOSTTEAM_GHOSTOS_ENDPOINT` and `GHOSTTEAM_GHOSTOS_MODEL` for deployment overrides.
 
@@ -234,7 +240,31 @@ When enabled, GhostTeam will:
 - import daemon messages into the local inbox when the local queue is empty
 - mirror task create/ack/complete transitions into KasperKonnect
 
-GhostTeam currently uses deterministic mirrored IDs for messages and task handoffs, so we do not need a separate durable mapping table yet. If we later need replay-safe reconciliation across restarts or multiple transports, that would be the point to add one.
+GhostTeam now persists KasperKonnect ID mappings and replay history in SQLite, so message and task reconciliation can survive restarts more cleanly.
+
+## Dashboard
+
+The standalone dashboard is the easiest way to operate GhostTeam locally.
+
+Open it from the API root:
+
+```text
+http://localhost:3000/
+```
+
+or, when running in Docker:
+
+```text
+http://localhost:8080/
+```
+
+Use the connection panel to set your API key, then manage agents, messages, tasks, GhostOS inference, and live logs from one screen.
+
+You can also print the local dashboard URL with:
+
+```bash
+ghostteam dashboard
+```
 
 ## Commands
 

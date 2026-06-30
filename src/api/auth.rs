@@ -18,12 +18,13 @@ struct ApiKeysConfig {
 }
 
 pub async fn require_api_key(request: Request<Body>, next: Next) -> Response {
-    let header_name = HeaderName::from_static(HEADER_NAME);
     let provided_key = request
         .headers()
-        .get(&header_name)
+        .get(HeaderName::from_static(HEADER_NAME))
         .and_then(|value| value.to_str().ok())
-        .map(str::to_string);
+        .map(str::to_string)
+        .or_else(|| query_param(request.uri().query(), "api_key"))
+        .or_else(|| query_param(request.uri().query(), "key"));
 
     let Some(provided_key) = provided_key else {
         log::warn!("api request rejected: missing X-GhostTeam-Key header");
@@ -70,4 +71,16 @@ fn unauthorized() -> Response {
         })),
     )
         .into_response()
+}
+
+fn query_param(query: Option<&str>, key: &str) -> Option<String> {
+    let query = query?;
+    query.split('&').find_map(|pair| {
+        let (name, value) = pair.split_once('=')?;
+        if name == key {
+            Some(value.to_string())
+        } else {
+            None
+        }
+    })
 }
