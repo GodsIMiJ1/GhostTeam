@@ -1,11 +1,11 @@
 use axum::{
+    Router,
     extract::{Json, Path},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::{db, tasks};
@@ -59,14 +59,9 @@ pub async fn list_messages() -> impl IntoResponse {
 
 pub async fn list_unread_messages(Path(agent): Path<String>) -> impl IntoResponse {
     match unread_messages(&agent) {
-        Ok(messages) => (
-            StatusCode::OK,
-            Json(ApiMessage {
-                ok: true,
-                data: messages,
-            }),
-        )
-            .into_response(),
+        Ok(messages) => {
+            (StatusCode::OK, Json(ApiMessage { ok: true, data: messages })).into_response()
+        }
         Err(error) => {
             log::error!("failed to list unread messages for {agent}: {error}");
             (
@@ -93,11 +88,7 @@ pub async fn send_message(Json(request): Json<SendMessageRequest>) -> impl IntoR
         )
             .into_response(),
         Err(error) => {
-            log::error!(
-                "failed to send message from {} to {}: {error}",
-                request.from,
-                request.to
-            );
+            log::error!("failed to send message from {} to {}: {error}", request.from, request.to);
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(serde_json::json!({
@@ -170,10 +161,7 @@ fn unread_messages(agent: &str) -> anyhow::Result<Vec<MessageResponse>> {
 
 fn mark_message_read(id: i64) -> anyhow::Result<bool> {
     let connection = db::open()?;
-    let affected = connection.execute(
-        "UPDATE messages SET read = 1 WHERE id = ?1",
-        params![id],
-    )?;
+    let affected = connection.execute("UPDATE messages SET read = 1 WHERE id = ?1", params![id])?;
     Ok(affected > 0)
 }
 

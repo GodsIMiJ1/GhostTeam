@@ -1,9 +1,9 @@
 use anyhow::{Context, Result};
-use reqwest::blocking::{Client, Response};
 use reqwest::Method;
-use serde::{Deserialize, Serialize};
+use reqwest::blocking::{Client, Response};
 use serde::de::DeserializeOwned;
-use serde_json::{json, Value};
+use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::env;
 use std::process;
 use std::sync::OnceLock;
@@ -113,11 +113,7 @@ impl KasperKonnectClient {
             }
         }
 
-        if probe_default_runtime() {
-            Some(Self::new(DEFAULT_BASE_URL))
-        } else {
-            None
-        }
+        if probe_default_runtime() { Some(Self::new(DEFAULT_BASE_URL)) } else { None }
     }
 
     pub fn new(base_url: impl Into<String>) -> Self {
@@ -134,12 +130,7 @@ impl KasperKonnectClient {
         &self.base_url
     }
 
-    pub fn register_environment(
-        &self,
-        id: &str,
-        role: &str,
-        backend: &str,
-    ) -> Result<()> {
+    pub fn register_environment(&self, id: &str, role: &str, backend: &str) -> Result<()> {
         let request = RegisterEnvironmentRequest {
             id: id.to_string(),
             display_name: format!("GhostTeam {id}"),
@@ -159,21 +150,12 @@ impl KasperKonnectClient {
     }
 
     pub fn heartbeat(&self, id: &str) -> Result<()> {
-        let _: Value = self.request_json(
-            Method::POST,
-            "/environments/heartbeat",
-            Some(json!({ "id": id })),
-        )?;
+        let _: Value =
+            self.request_json(Method::POST, "/environments/heartbeat", Some(json!({ "id": id })))?;
         Ok(())
     }
 
-    pub fn send_message(
-        &self,
-        local_id: i64,
-        from: &str,
-        to: &str,
-        body: &str,
-    ) -> Result<String> {
+    pub fn send_message(&self, local_id: i64, from: &str, to: &str, body: &str) -> Result<String> {
         let payload = json!({
             "body": body,
             "sourceAgent": from,
@@ -191,7 +173,8 @@ impl KasperKonnectClient {
             "metadata": message_metadata(),
         });
 
-        let response: MessageEnvelope = self.request_json(Method::POST, "/messages", Some(request))?;
+        let response: MessageEnvelope =
+            self.request_json(Method::POST, "/messages", Some(request))?;
         Ok(response.id)
     }
 
@@ -202,11 +185,8 @@ impl KasperKonnectClient {
             messages: Vec<MessageEnvelope>,
         }
 
-        let response: ResponseBody = self.request_json(
-            Method::GET,
-            &format!("/messages?targetEnv={target_env}"),
-            None,
-        )?;
+        let response: ResponseBody =
+            self.request_json(Method::GET, &format!("/messages?targetEnv={target_env}"), None)?;
         Ok(response.messages)
     }
 
@@ -238,7 +218,8 @@ impl KasperKonnectClient {
             }
         });
 
-        let response: TaskHandoff = self.request_json(Method::POST, "/tasks/handoff", Some(request))?;
+        let response: TaskHandoff =
+            self.request_json(Method::POST, "/tasks/handoff", Some(request))?;
         Ok(response.task_id)
     }
 
@@ -321,9 +302,9 @@ impl KasperKonnectClient {
         let response = request
             .send()
             .with_context(|| format!("failed to send KasperKonnect request to {url}"))?;
-        let response = response.error_for_status().with_context(|| {
-            format!("KasperKonnect returned an error status from {url}")
-        })?;
+        let response = response
+            .error_for_status()
+            .with_context(|| format!("KasperKonnect returned an error status from {url}"))?;
         decode_json(response, &url)
     }
 }
@@ -337,11 +318,7 @@ fn decode_json<T: DeserializeOwned>(response: Response, url: &str) -> Result<T> 
 }
 
 fn message_metadata() -> MessageMetadata {
-    MessageMetadata {
-        trace_id: None,
-        priority: "normal".to_string(),
-        created_at: now_string(),
-    }
+    MessageMetadata { trace_id: None, priority: "normal".to_string(), created_at: now_string() }
 }
 
 fn capabilities_for(role: &str, backend: &str) -> Vec<String> {
@@ -362,9 +339,7 @@ fn first_line(input: &str) -> String {
 }
 
 fn now_string() -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or_default();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
     now.as_secs().to_string()
 }
 
@@ -398,10 +373,7 @@ fn probe_default_runtime() -> bool {
     match client.get(&url).send() {
         Ok(response) if response.status().is_success() => true,
         Ok(response) => {
-            log::debug!(
-                "KasperKonnect probe at {url} returned status {}",
-                response.status()
-            );
+            log::debug!("KasperKonnect probe at {url} returned status {}", response.status());
             false
         }
         Err(error) => {

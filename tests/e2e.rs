@@ -53,19 +53,13 @@ struct MockBackend {
 
 impl MockBackend {
     fn new(reply: &str) -> Self {
-        Self {
-            reply: reply.to_string(),
-            prompts: Arc::new(Mutex::new(Vec::new())),
-        }
+        Self { reply: reply.to_string(), prompts: Arc::new(Mutex::new(Vec::new())) }
     }
 }
 
 impl model::ModelBackend for MockBackend {
     fn generate(&self, prompt: &str) -> anyhow::Result<String> {
-        self.prompts
-            .lock()
-            .expect("prompt log poisoned")
-            .push(prompt.to_string());
+        self.prompts.lock().expect("prompt log poisoned").push(prompt.to_string());
         Ok(self.reply.clone())
     }
 }
@@ -107,10 +101,10 @@ mod tests {
 
         db::init_workspace().expect("failed to initialize workspace");
 
-        let manager_id = agent::join_agent("manager", "manager", "ghostos")
-            .expect("failed to join manager");
-        let worker_id = agent::join_agent("worker", "worker", "ghostos")
-            .expect("failed to join worker");
+        let manager_id =
+            agent::join_agent("manager", "manager", "ghostos").expect("failed to join manager");
+        let worker_id =
+            agent::join_agent("worker", "worker", "ghostos").expect("failed to join worker");
         let inspector_id = agent::join_agent("inspector", "inspector", "ghostos")
             .expect("failed to join inspector");
 

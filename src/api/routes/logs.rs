@@ -2,13 +2,13 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use axum::{
+    Router,
     extract::{
-        ws::{Message, WebSocket, WebSocketUpgrade},
         Path,
+        ws::{Message, WebSocket, WebSocketUpgrade},
     },
     response::IntoResponse,
     routing::get,
-    Router,
 };
 use tokio::fs::OpenOptions;
 use tokio::io::{AsyncBufReadExt, AsyncSeekExt, BufReader};
@@ -40,15 +40,13 @@ async fn tail_log_stream(mut socket: WebSocket, agent: String) {
                 break;
             }
             Err(error) => {
-                if let Err(ws_error) = socket.send(Message::Text(format!(
-                    "waiting for log file {}: {error}",
-                    log_path.display()
-                ).into()))
-                .await
+                if let Err(ws_error) = socket
+                    .send(Message::Text(
+                        format!("waiting for log file {}: {error}", log_path.display()).into(),
+                    ))
+                    .await
                 {
-                    log::error!(
-                        "failed to notify websocket client for agent={agent}: {ws_error}"
-                    );
+                    log::error!("failed to notify websocket client for agent={agent}: {ws_error}");
                     break;
                 }
                 sleep(Duration::from_millis(500)).await;

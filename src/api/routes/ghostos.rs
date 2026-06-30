@@ -1,10 +1,4 @@
-use axum::{
-    extract::Json,
-    http::StatusCode,
-    response::IntoResponse,
-    routing::post,
-    Router,
-};
+use axum::{Router, extract::Json, http::StatusCode, response::IntoResponse, routing::post};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -29,11 +23,7 @@ pub fn router() -> Router {
 
 pub async fn infer(Json(request): Json<InferRequest>) -> impl IntoResponse {
     match infer_with_config(&request.prompt).await {
-        Ok(output) => (
-            StatusCode::OK,
-            Json(InferResponse { output }),
-        )
-            .into_response(),
+        Ok(output) => (StatusCode::OK, Json(InferResponse { output })).into_response(),
         Err(error) => {
             log::error!("ghostos infer failed: {error}");
             (
@@ -49,10 +39,8 @@ pub async fn infer(Json(request): Json<InferRequest>) -> impl IntoResponse {
 
 async fn infer_with_config(prompt: &str) -> anyhow::Result<String> {
     let config = GhostOsConfig::load()?;
-    let client = Client::builder()
-        .timeout(Duration::from_secs(120))
-        .build()
-        .map_err(anyhow::Error::from)?;
+    let client =
+        Client::builder().timeout(Duration::from_secs(120)).build().map_err(anyhow::Error::from)?;
 
     let mut last_error = None;
 

@@ -1,11 +1,11 @@
 use axum::{
+    Router,
     extract::{Json, Path},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::{db, tasks};
@@ -80,14 +80,7 @@ pub fn router() -> Router {
 
 pub async fn list_tasks() -> impl IntoResponse {
     match load_all_tasks() {
-        Ok(tasks) => (
-            StatusCode::OK,
-            Json(ApiMessage {
-                ok: true,
-                data: tasks,
-            }),
-        )
-            .into_response(),
+        Ok(tasks) => (StatusCode::OK, Json(ApiMessage { ok: true, data: tasks })).into_response(),
         Err(error) => {
             log::error!("failed to list tasks: {error}");
             (
@@ -105,11 +98,9 @@ pub async fn list_tasks() -> impl IntoResponse {
 pub async fn create_task(Json(request): Json<CreateTaskRequest>) -> impl IntoResponse {
     match tasks::create_task(&request.from, &request.to, &request.description) {
         Ok(id) => match get_task_detail(id) {
-            Ok(Some(task)) => (
-                StatusCode::CREATED,
-                Json(ApiMessage { ok: true, data: task }),
-            )
-                .into_response(),
+            Ok(Some(task)) => {
+                (StatusCode::CREATED, Json(ApiMessage { ok: true, data: task })).into_response()
+            }
             Ok(None) => (
                 StatusCode::CREATED,
                 Json(serde_json::json!({
@@ -168,14 +159,9 @@ pub async fn requeue_task(Json(request): Json<RequeueTaskRequest>) -> impl IntoR
 
 pub async fn get_task(Path(id): Path<i64>) -> impl IntoResponse {
     match get_task_detail(id) {
-        Ok(Some(task)) => (
-            StatusCode::OK,
-            Json(ApiMessage {
-                ok: true,
-                data: task,
-            }),
-        )
-            .into_response(),
+        Ok(Some(task)) => {
+            (StatusCode::OK, Json(ApiMessage { ok: true, data: task })).into_response()
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({

@@ -13,7 +13,8 @@ pub struct LlamaCppBackend {
 
 impl Default for LlamaCppBackend {
     fn default() -> Self {
-        let binary = env::var("GHOSTTEAM_LLAMA_CPP_BIN").unwrap_or_else(|_| "llama-cli".to_string());
+        let binary =
+            env::var("GHOSTTEAM_LLAMA_CPP_BIN").unwrap_or_else(|_| "llama-cli".to_string());
         let args = env::var("GHOSTTEAM_LLAMA_CPP_ARGS")
             .ok()
             .and_then(|value| serde_json::from_str::<Vec<String>>(&value).ok())
@@ -46,7 +47,10 @@ impl ModelBackend for LlamaCppBackend {
             stdin
                 .write_all(prompt.as_bytes())
                 .map_err(|error| {
-                    log::error!("failed to write prompt to llama.cpp stdin for {}: {error}", self.binary);
+                    log::error!(
+                        "failed to write prompt to llama.cpp stdin for {}: {error}",
+                        self.binary
+                    );
                     error
                 })
                 .context("failed to write prompt to llama.cpp stdin")?;
@@ -76,11 +80,7 @@ impl ModelBackend for LlamaCppBackend {
         }
 
         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-        log::debug!(
-            "llama.cpp response binary={} bytes={}",
-            self.binary,
-            stdout.len()
-        );
+        log::debug!("llama.cpp response binary={} bytes={}", self.binary, stdout.len());
         Ok(stdout)
     }
 }

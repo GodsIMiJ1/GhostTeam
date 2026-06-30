@@ -62,12 +62,10 @@ impl ModelBackend for OllamaBackend {
                 error
             })?;
 
-        let payload: OllamaGenerateResponse = response
-            .json()
-            .map_err(|error| {
-                log::error!("failed to decode ollama response endpoint={}: {error}", self.endpoint);
-                error
-            })?;
+        let payload: OllamaGenerateResponse = response.json().map_err(|error| {
+            log::error!("failed to decode ollama response endpoint={}: {error}", self.endpoint);
+            error
+        })?;
 
         log::debug!(
             "ollama response endpoint={} bytes={}",

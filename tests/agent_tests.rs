@@ -5,14 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+#[path = "../src/agent.rs"]
+mod agent;
 #[path = "../src/db.rs"]
 mod db;
 #[path = "../src/model/mod.rs"]
 mod model;
 #[path = "../src/roles.rs"]
 mod roles;
-#[path = "../src/agent.rs"]
-mod agent;
 
 static TEST_LOCK: Mutex<()> = Mutex::new(());
 
@@ -73,10 +73,7 @@ struct MockBackend {
 
 impl model::ModelBackend for MockBackend {
     fn generate(&self, prompt: &str) -> anyhow::Result<String> {
-        self.prompts
-            .lock()
-            .expect("prompt log poisoned")
-            .push(prompt.to_string());
+        self.prompts.lock().expect("prompt log poisoned").push(prompt.to_string());
         Ok(format!("mock-reply::{prompt}"))
     }
 }
@@ -147,7 +144,8 @@ mod tests {
             .expect("failed to seed message");
 
         let backend = MockBackend::default();
-        let processed = agent::process_inbox_once("worker", "worker", &backend).expect("poll failed");
+        let processed =
+            agent::process_inbox_once("worker", "worker", &backend).expect("poll failed");
         assert_eq!(processed, 1);
 
         let prompts = backend.prompts.lock().expect("prompt log poisoned");

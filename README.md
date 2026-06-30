@@ -286,6 +286,67 @@ The intended command surface is:
 
 That makes Telegram the lightweight front door for dispatch, status checks, and human-in-the-loop oversight while GhostTeam keeps the coordination state.
 
+## Telegram Bridge Setup
+
+Phase 1 adds a separate Rust Telegram bridge binary that talks to the existing GhostTeam API. It supports `/status` and `/agents` and keeps the Telegram process isolated from the main API service.
+
+### 1. Create a bot token
+
+Use Telegram's `@BotFather` to create a bot and copy the token it gives you. Keep the token private.
+
+### 2. Set environment variables
+
+Example `.env` snippet:
+
+```env
+TELEGRAM_BOT_TOKEN=123456:example-token
+GHOSTTEAM_API_URL=http://127.0.0.1:8080
+GHOSTTEAM_API_KEY=replace-with-your-ghostteam-api-key
+LOG_LEVEL=info
+```
+
+`GHOSTTEAM_API_URL` should point at the running GhostTeam API. If you are using the local API server, `http://127.0.0.1:8080` is a good default.
+
+### 3. Run the bridge
+
+Start the API first, then launch the bot:
+
+```bash
+ghostteam --api
+cargo run --bin ghostteam-telegram
+```
+
+If you prefer a release build:
+
+```bash
+cargo run --release --bin ghostteam-telegram
+```
+
+### 4. Test the commands
+
+In Telegram, send:
+
+```text
+/status
+/agents
+```
+
+`/status` checks API reachability and shows the configured base URL, timestamp, and any summary data the current API can provide. `/agents` prints the registered agent list in a clean operator-friendly format.
+
+### Dev note
+
+The bridge is intentionally a thin HTTP client. It polls Telegram, calls the GhostTeam API, and formats the reply. That keeps the first phase easy to reason about and makes the next command additions straightforward.
+
+The next commands we should add are:
+
+- `/tasks`
+- `/assign`
+- `/logs`
+- `/handoff`
+- `/help`
+
+See `docs/telegram-command-hub-phase1.md` for the short architecture note.
+
 ## KasperKonnect Integration
 
 GhostTeam can announce joined agents to KasperKonnect, mirror messages into the daemon, and forward task handoffs when the runtime fabric is available.

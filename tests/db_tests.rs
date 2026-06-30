@@ -137,17 +137,21 @@ mod tests {
 
         drop(db::open().expect("failed to open workspace db"));
 
-        let reopened_remote_message = db::lookup_remote_id("message", 42)
-            .expect("failed to look up message mapping");
-        let reopened_local_task = db::lookup_local_id("task", "remote-task-7")
-            .expect("failed to look up task mapping");
+        let reopened_remote_message =
+            db::lookup_remote_id("message", 42).expect("failed to look up message mapping");
+        let reopened_local_task =
+            db::lookup_local_id("task", "remote-task-7").expect("failed to look up task mapping");
         let mappings = db::list_id_mappings().expect("failed to list id mappings");
 
         assert_eq!(reopened_remote_message.as_deref(), Some("remote-msg-42"));
         assert_eq!(reopened_local_task.as_deref(), Some("7"));
         assert_eq!(mappings.len(), 2);
-        assert!(mappings.iter().any(|mapping| mapping.entity_kind == "message" && mapping.local_id == "42" && mapping.remote_id == "remote-msg-42"));
-        assert!(mappings.iter().any(|mapping| mapping.entity_kind == "task" && mapping.local_id == "7" && mapping.remote_id == "remote-task-7"));
+        assert!(mappings.iter().any(|mapping| mapping.entity_kind == "message"
+            && mapping.local_id == "42"
+            && mapping.remote_id == "remote-msg-42"));
+        assert!(mappings.iter().any(|mapping| mapping.entity_kind == "task"
+            && mapping.local_id == "7"
+            && mapping.remote_id == "remote-task-7"));
     }
 
     #[test]
@@ -157,20 +161,10 @@ mod tests {
 
         db::init_workspace().expect("workspace initialization failed");
 
-        db::record_id_mapping(
-            "message",
-            42,
-            "remote-msg-42",
-            Some("http://127.0.0.1:4077"),
-        )
-        .expect("failed to record initial mapping");
-        db::record_id_mapping(
-            "message",
-            42,
-            "remote-msg-42-v2",
-            Some("http://127.0.0.1:4077"),
-        )
-        .expect("failed to record updated mapping");
+        db::record_id_mapping("message", 42, "remote-msg-42", Some("http://127.0.0.1:4077"))
+            .expect("failed to record initial mapping");
+        db::record_id_mapping("message", 42, "remote-msg-42-v2", Some("http://127.0.0.1:4077"))
+            .expect("failed to record updated mapping");
 
         drop(db::open().expect("failed to open workspace db"));
 

@@ -1,8 +1,8 @@
 use axum::{
+    Router,
     http::header,
     response::{Html, IntoResponse},
     routing::get,
-    Router,
 };
 
 const INDEX_HTML: &str = include_str!("../../../dashboard/index.html");
@@ -29,15 +29,9 @@ pub async fn styles() -> impl IntoResponse {
 }
 
 pub async fn script() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "application/javascript; charset=utf-8")],
-        DASHBOARD_JS,
-    )
+    ([(header::CONTENT_TYPE, "application/javascript; charset=utf-8")], DASHBOARD_JS)
 }
 
 pub async fn icon() -> impl IntoResponse {
-    (
-        [(header::CONTENT_TYPE, "image/svg+xml; charset=utf-8")],
-        DASHBOARD_ICON,
-    )
+    ([(header::CONTENT_TYPE, "image/svg+xml; charset=utf-8")], DASHBOARD_ICON)
 }

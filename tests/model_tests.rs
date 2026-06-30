@@ -2,7 +2,7 @@ use std::env;
 use std::ffi::OsString;
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{mpsc, Mutex};
+use std::sync::{Mutex, mpsc};
 use std::thread;
 
 #[path = "../src/model/mod.rs"]
@@ -85,7 +85,9 @@ fn read_http_body(stream: &mut TcpStream) -> String {
     String::from_utf8(buf[header_end + 4..].to_vec()).expect("request body is not utf-8")
 }
 
-fn spawn_ollama_server(response_json: String) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
+fn spawn_ollama_server(
+    response_json: String,
+) -> (String, mpsc::Receiver<String>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind mock ollama server");
     let addr = listener.local_addr().expect("failed to read local addr");
     let (tx, rx) = mpsc::channel();
@@ -100,9 +102,7 @@ fn spawn_ollama_server(response_json: String) -> (String, mpsc::Receiver<String>
             response_json.len(),
             response_json
         );
-        stream
-            .write_all(response.as_bytes())
-            .expect("failed to write ollama response");
+        stream.write_all(response.as_bytes()).expect("failed to write ollama response");
     });
 
     (format!("http://{addr}/api/generate"), rx, handle)
@@ -137,15 +137,14 @@ mod tests {
     #[test]
     fn llamacpp_backend_spawns_subprocess_and_reads_stdout() {
         let _guard = TEST_LOCK.lock().expect("test lock poisoned");
-        let command = "$inputText = [Console]::In.ReadToEnd(); [Console]::Out.Write('mock:' + $inputText)";
+        let command =
+            "$inputText = [Console]::In.ReadToEnd(); [Console]::Out.Write('mock:' + $inputText)";
         let args = serde_json::json!(["-NoProfile", "-Command", command]).to_string();
         let _bin_guard = EnvGuard::set("GHOSTTEAM_LLAMA_CPP_BIN", "powershell");
         let _args_guard = EnvGuard::set("GHOSTTEAM_LLAMA_CPP_ARGS", &args);
 
         let backend = model::llamacpp::LlamaCppBackend::default();
-        let reply = backend
-            .generate("hello from llama.cpp")
-            .expect("llama.cpp generation failed");
+        let reply = backend.generate("hello from llama.cpp").expect("llama.cpp generation failed");
 
         assert_eq!(reply, "mock:hello from llama.cpp");
     }

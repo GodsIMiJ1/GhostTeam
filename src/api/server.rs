@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-use axum::{middleware, Router};
+use axum::{Router, middleware};
 use thiserror::Error;
 use tokio::net::TcpListener;
 
@@ -33,13 +33,9 @@ pub fn build_router() -> Router {
 
 pub async fn start_api_server(port: u16) -> Result<(), ApiServerError> {
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
-    let listener = TcpListener::bind(addr)
-        .await
-        .map_err(|source| ApiServerError::Bind { addr, source })?;
+    let listener =
+        TcpListener::bind(addr).await.map_err(|source| ApiServerError::Bind { addr, source })?;
 
     log::info!("starting GhostTeam API server on {addr}");
-    axum::serve(listener, build_router())
-        .await
-        .map_err(ApiServerError::from)
-        .map(|_| ())
+    axum::serve(listener, build_router()).await.map_err(ApiServerError::from).map(|_| ())
 }

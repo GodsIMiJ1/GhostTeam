@@ -1,6 +1,6 @@
 use axum::{
     body::Body,
-    http::{header::HeaderName, Request, StatusCode},
+    http::{Request, StatusCode, header::HeaderName},
     middleware::Next,
     response::{IntoResponse, Response},
 };
@@ -49,10 +49,12 @@ pub async fn require_api_key(request: Request<Body>, next: Next) -> Response {
 
 fn load_api_keys() -> anyhow::Result<ApiKeysConfig> {
     let path = api_keys_path();
-    let contents = fs::read_to_string(&path)
-        .map_err(|error| anyhow::anyhow!("failed to read API keys file at {}: {error}", path.display()))?;
-    let config = serde_yaml::from_str::<ApiKeysConfig>(&contents)
-        .map_err(|error| anyhow::anyhow!("failed to parse API keys file at {}: {error}", path.display()))?;
+    let contents = fs::read_to_string(&path).map_err(|error| {
+        anyhow::anyhow!("failed to read API keys file at {}: {error}", path.display())
+    })?;
+    let config = serde_yaml::from_str::<ApiKeysConfig>(&contents).map_err(|error| {
+        anyhow::anyhow!("failed to parse API keys file at {}: {error}", path.display())
+    })?;
     Ok(config)
 }
 
@@ -77,10 +79,6 @@ fn query_param(query: Option<&str>, key: &str) -> Option<String> {
     let query = query?;
     query.split('&').find_map(|pair| {
         let (name, value) = pair.split_once('=')?;
-        if name == key {
-            Some(value.to_string())
-        } else {
-            None
-        }
+        if name == key { Some(value.to_string()) } else { None }
     })
 }

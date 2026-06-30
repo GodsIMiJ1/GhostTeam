@@ -9,24 +9,23 @@ use crate::konnect;
 pub fn send_message(from: &str, to: &str, body: &str) -> Result<()> {
     log::debug!("task-layer send_message from={from} to={to} bytes={}", body.len());
     let connection = db::open()?;
-    connection.execute(
-        "INSERT INTO messages (sender, recipient, body, created_at, read)
+    connection
+        .execute(
+            "INSERT INTO messages (sender, recipient, body, created_at, read)
          VALUES (?1, ?2, ?3, datetime('now'), 0)",
-        params![from, to, body],
-    ).map_err(|error| {
-        log::error!("failed to insert message from {from} to {to}: {error}");
-        error
-    })?;
+            params![from, to, body],
+        )
+        .map_err(|error| {
+            log::error!("failed to insert message from {from} to {to}: {error}");
+            error
+        })?;
     let local_id = connection.last_insert_rowid();
     if let Some(client) = konnect::client() {
         match client.send_message(local_id, from, to, body) {
             Ok(remote_id) => {
-                if let Err(error) = db::record_id_mapping(
-                    "message",
-                    local_id,
-                    &remote_id,
-                    Some(client.base_url()),
-                ) {
+                if let Err(error) =
+                    db::record_id_mapping("message", local_id, &remote_id, Some(client.base_url()))
+                {
                     log::warn!(
                         "failed to persist message mapping local_id={local_id} remote_id={remote_id}: {error}"
                     );
@@ -84,12 +83,9 @@ pub fn create_task(from: &str, to: &str, description: &str) -> Result<i64> {
     if let Some(client) = konnect::client() {
         match client.create_task_handoff(task_id, from, to, description) {
             Ok(remote_id) => {
-                if let Err(error) = db::record_id_mapping(
-                    "task",
-                    task_id,
-                    &remote_id,
-                    Some(client.base_url()),
-                ) {
+                if let Err(error) =
+                    db::record_id_mapping("task", task_id, &remote_id, Some(client.base_url()))
+                {
                     log::warn!(
                         "failed to persist task mapping local_id={task_id} remote_id={remote_id}: {error}"
                     );
@@ -107,18 +103,21 @@ pub fn create_task(from: &str, to: &str, description: &str) -> Result<i64> {
 pub fn ack_task(id: i64, worker: &str) -> Result<()> {
     log::info!("acking task id={id} worker={worker}");
     let connection = db::open()?;
-    connection.execute(
-        "UPDATE tasks
+    connection
+        .execute(
+            "UPDATE tasks
          SET status = 'acked', assignee = ?2, updated_at = datetime('now')
          WHERE id = ?1",
-        params![id, worker],
-    ).map_err(|error| {
-        log::error!("failed to ack task id={id} worker={worker}: {error}");
-        error
-    })?;
+            params![id, worker],
+        )
+        .map_err(|error| {
+            log::error!("failed to ack task id={id} worker={worker}: {error}");
+            error
+        })?;
     insert_history(&connection, id, "acked", worker)?;
     if let Some(client) = konnect::client() {
-        let remote_id = db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
+        let remote_id =
+            db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
         if let Err(error) = client.acknowledge_task_handoff(id, worker) {
             log::warn!(
                 "failed to mirror ack for task {id} (remote={remote_id}) to KasperKonnect: {error}"
@@ -132,18 +131,21 @@ pub fn ack_task(id: i64, worker: &str) -> Result<()> {
 pub fn complete_task(id: i64, worker: &str, result: &str) -> Result<()> {
     log::info!("completing task id={id} worker={worker}");
     let connection = db::open()?;
-    connection.execute(
-        "UPDATE tasks
+    connection
+        .execute(
+            "UPDATE tasks
          SET status = 'completed', result = ?2, assignee = ?3, updated_at = datetime('now')
          WHERE id = ?1",
-        params![id, result, worker],
-    ).map_err(|error| {
-        log::error!("failed to complete task id={id} worker={worker}: {error}");
-        error
-    })?;
+            params![id, result, worker],
+        )
+        .map_err(|error| {
+            log::error!("failed to complete task id={id} worker={worker}: {error}");
+            error
+        })?;
     insert_history(&connection, id, "completed", worker)?;
     if let Some(client) = konnect::client() {
-        let remote_id = db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
+        let remote_id =
+            db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
         if let Err(error) = client.complete_task_handoff(id, worker) {
             log::warn!(
                 "failed to mirror completion for task {id} (remote={remote_id}) to KasperKonnect: {error}"
@@ -157,15 +159,17 @@ pub fn complete_task(id: i64, worker: &str, result: &str) -> Result<()> {
 pub fn requeue_task(id: i64) -> Result<()> {
     log::info!("requeueing task id={id}");
     let connection = db::open()?;
-    connection.execute(
-        "UPDATE tasks
+    connection
+        .execute(
+            "UPDATE tasks
          SET status = 'requeued', updated_at = datetime('now')
          WHERE id = ?1",
-        params![id],
-    ).map_err(|error| {
-        log::error!("failed to requeue task id={id}: {error}");
-        error
-    })?;
+            params![id],
+        )
+        .map_err(|error| {
+            log::error!("failed to requeue task id={id}: {error}");
+            error
+        })?;
     insert_history(&connection, id, "requeued", "system")?;
     if konnect::client().is_some() {
         log::debug!("task {id} requeued locally; KasperKonnect has no dedicated requeue route");
@@ -244,10 +248,7 @@ fn unread_messages(connection: &rusqlite::Connection, recipient: &str) -> Result
 
 fn mark_messages_read(connection: &rusqlite::Connection, messages: &[MessageRow]) -> Result<()> {
     for message in messages {
-        connection.execute(
-            "UPDATE messages SET read = 1 WHERE id = ?1",
-            params![message.id],
-        )?;
+        connection.execute("UPDATE messages SET read = 1 WHERE id = ?1", params![message.id])?;
     }
     Ok(())
 }

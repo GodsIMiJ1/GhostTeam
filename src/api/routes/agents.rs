@@ -1,11 +1,11 @@
 use axum::{
+    Router,
     extract::{Json, Path},
     http::StatusCode,
     response::IntoResponse,
     routing::{get, post},
-    Router,
 };
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use serde::{Deserialize, Serialize};
 
 use crate::{agent, db};
@@ -47,10 +47,7 @@ pub fn router() -> Router {
 pub async fn list_agents() -> impl IntoResponse {
     match agent::list_agents() {
         Ok(agents) => {
-            let payload = agents
-                .into_iter()
-                .map(AgentResponse::from)
-                .collect::<Vec<_>>();
+            let payload = agents.into_iter().map(AgentResponse::from).collect::<Vec<_>>();
             (StatusCode::OK, Json(ApiMessage { ok: true, data: payload })).into_response()
         }
         Err(error) => {
@@ -70,14 +67,9 @@ pub async fn list_agents() -> impl IntoResponse {
 pub async fn join_agent(Json(request): Json<JoinAgentRequest>) -> impl IntoResponse {
     match agent::join_agent(&request.id, &request.role, &request.backend) {
         Ok(final_id) => match get_agent_row(&final_id) {
-            Ok(Some(agent)) => (
-                StatusCode::CREATED,
-                Json(ApiMessage {
-                    ok: true,
-                    data: agent,
-                }),
-            )
-                .into_response(),
+            Ok(Some(agent)) => {
+                (StatusCode::CREATED, Json(ApiMessage { ok: true, data: agent })).into_response()
+            }
             Ok(None) => (
                 StatusCode::CREATED,
                 Json(serde_json::json!({
@@ -140,7 +132,9 @@ pub async fn leave_agent(Json(request): Json<LeaveAgentRequest>) -> impl IntoRes
 
 pub async fn get_agent(Path(id): Path<String>) -> impl IntoResponse {
     match get_agent_row(&id) {
-        Ok(Some(agent)) => (StatusCode::OK, Json(ApiMessage { ok: true, data: agent })).into_response(),
+        Ok(Some(agent)) => {
+            (StatusCode::OK, Json(ApiMessage { ok: true, data: agent })).into_response()
+        }
         Ok(None) => (
             StatusCode::NOT_FOUND,
             Json(serde_json::json!({
@@ -165,12 +159,7 @@ pub async fn get_agent(Path(id): Path<String>) -> impl IntoResponse {
 
 impl From<db::AgentRow> for AgentResponse {
     fn from(value: db::AgentRow) -> Self {
-        Self {
-            id: value.id,
-            role: value.role,
-            backend: value.backend,
-            joined_at: value.joined_at,
-        }
+        Self { id: value.id, role: value.role, backend: value.backend, joined_at: value.joined_at }
     }
 }
 

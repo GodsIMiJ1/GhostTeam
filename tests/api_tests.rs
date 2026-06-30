@@ -7,16 +7,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use axum::{
-    extract::State,
-    routing::post,
-    Json, Router,
-};
+use axum::{Json, Router, extract::State, routing::post};
 use futures_util::StreamExt;
 use reqwest::Client;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use tokio::net::TcpListener;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 use tokio_tungstenite::{connect_async, tungstenite::http::Request as WsRequest};
 
 #[path = "../src/agent.rs"]
@@ -81,11 +77,7 @@ fn prepare_workspace(label: &str) -> (PathBuf, WorkspaceEnv) {
     let root = unique_workspace(label);
     fs::create_dir_all(root.join(".ghostteam/logs")).expect("failed to create logs directory");
     let api_keys = root.join(".ghostteam/api_keys.yaml");
-    fs::write(
-        &api_keys,
-        "keys:\n  - abc123\n  - xyz789\n",
-    )
-    .expect("failed to write api keys");
+    fs::write(&api_keys, "keys:\n  - abc123\n  - xyz789\n").expect("failed to write api keys");
     let config = root.join(".ghostteam/config.yaml");
     fs::write(
         &config,
@@ -97,9 +89,7 @@ fn prepare_workspace(label: &str) -> (PathBuf, WorkspaceEnv) {
 }
 
 async fn spawn_router_server(router: Router) -> (SocketAddr, tokio::task::JoinHandle<()>) {
-    let listener = TcpListener::bind("127.0.0.1:0")
-        .await
-        .expect("failed to bind test server");
+    let listener = TcpListener::bind("127.0.0.1:0").await.expect("failed to bind test server");
     let addr = listener.local_addr().expect("failed to read local addr");
     let handle = tokio::spawn(async move {
         let _ = axum::serve(listener, router).await;
@@ -131,10 +121,7 @@ async fn spawn_api_server() -> (String, tokio::task::JoinHandle<()>) {
 async fn spawn_mock_ghostos() -> (String, Arc<Mutex<Option<Value>>>, tokio::task::JoinHandle<()>) {
     let received = Arc::new(Mutex::new(None));
     let output = "mock ghostos output".to_string();
-    let state = MockGhostOsState {
-        received: Arc::clone(&received),
-        output: output.clone(),
-    };
+    let state = MockGhostOsState { received: Arc::clone(&received), output: output.clone() };
 
     async fn infer_handler(
         State(state): State<MockGhostOsState>,
@@ -144,17 +131,13 @@ async fn spawn_mock_ghostos() -> (String, Arc<Mutex<Option<Value>>>, tokio::task
         Json(json!({ "output": state.output }))
     }
 
-    let router = Router::new()
-        .route("/infer", post(infer_handler))
-        .with_state(state);
+    let router = Router::new().route("/infer", post(infer_handler)).with_state(state);
     let (addr, handle) = spawn_router_server(router).await;
     (format!("http://{addr}/infer"), received, handle)
 }
 
 fn auth_client() -> Client {
-    Client::builder()
-        .build()
-        .expect("failed to build reqwest client")
+    Client::builder().build().expect("failed to build reqwest client")
 }
 
 struct ServerHandle(tokio::task::JoinHandle<()>);
@@ -327,9 +310,7 @@ mod tests {
         let config_path = _root.join(".ghostteam/config.yaml");
         fs::write(
             &config_path,
-            format!(
-                "ghostos_endpoint: \"{ghostos_endpoint}\"\nghostos_model: \"ghost-1\"\n"
-            ),
+            format!("ghostos_endpoint: \"{ghostos_endpoint}\"\nghostos_model: \"ghost-1\"\n"),
         )
         .expect("failed to write ghostos config");
 
@@ -387,9 +368,7 @@ mod tests {
             .body(())
             .expect("failed to build websocket request");
 
-        let (mut ws_stream, _) = connect_async(ws_request)
-            .await
-            .expect("websocket connect failed");
+        let (mut ws_stream, _) = connect_async(ws_request).await.expect("websocket connect failed");
 
         append_log_line(&root, agent, "first streamed line");
 

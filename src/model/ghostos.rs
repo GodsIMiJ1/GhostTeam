@@ -1,7 +1,7 @@
 use anyhow::{Context, Result};
 use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::env;
 use std::fs;
 use std::path::PathBuf;
@@ -36,17 +36,12 @@ impl GhostOsConfig {
     pub fn load() -> Result<Self> {
         let path = config_path();
         let mut config = if path.exists() {
-            let contents = fs::read_to_string(&path).with_context(|| {
-                format!("failed to read GhostOS config at {}", path.display())
-            })?;
-            serde_yaml::from_str(&contents).with_context(|| {
-                format!("failed to parse GhostOS config at {}", path.display())
-            })?
+            let contents = fs::read_to_string(&path)
+                .with_context(|| format!("failed to read GhostOS config at {}", path.display()))?;
+            serde_yaml::from_str(&contents)
+                .with_context(|| format!("failed to parse GhostOS config at {}", path.display()))?
         } else {
-            log::info!(
-                "ghostos config not found at {}, using defaults",
-                path.display()
-            );
+            log::info!("ghostos config not found at {}, using defaults", path.display());
             Self::default()
         };
 
@@ -114,7 +109,9 @@ impl ModelBackend for GhostOsBackend {
                 Ok(response) => match response.error_for_status() {
                     Ok(ok_response) => match ok_response.json::<Value>() {
                         Ok(value) => {
-                            if let Some(output) = value.get("output").and_then(|entry| entry.as_str()) {
+                            if let Some(output) =
+                                value.get("output").and_then(|entry| entry.as_str())
+                            {
                                 log::debug!(
                                     "ghostos response endpoint={} output_bytes={}",
                                     config.ghostos_endpoint,

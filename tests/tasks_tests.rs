@@ -73,7 +73,11 @@ mod tests {
             .query_row("SELECT status FROM tasks WHERE id = ?1", params![task_id], |row| row.get(0))
             .expect("failed to fetch task status");
         let history_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM task_history WHERE task_id = ?1", params![task_id], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM task_history WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
             .expect("failed to count history rows");
 
         assert_eq!(status, "created");
@@ -95,7 +99,11 @@ mod tests {
             .query_row("SELECT status FROM tasks WHERE id = ?1", params![task_id], |row| row.get(0))
             .expect("failed to fetch task status");
         let history_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM task_history WHERE task_id = ?1", params![task_id], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM task_history WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
             .expect("failed to count history rows");
 
         assert_eq!(status, "acked");
@@ -121,7 +129,11 @@ mod tests {
             .query_row("SELECT result FROM tasks WHERE id = ?1", params![task_id], |row| row.get(0))
             .expect("failed to fetch task result");
         let history_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM task_history WHERE task_id = ?1", params![task_id], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM task_history WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
             .expect("failed to count history rows");
 
         assert_eq!(status, "completed");
@@ -144,7 +156,11 @@ mod tests {
             .query_row("SELECT status FROM tasks WHERE id = ?1", params![task_id], |row| row.get(0))
             .expect("failed to fetch task status");
         let history_count: i64 = connection
-            .query_row("SELECT COUNT(*) FROM task_history WHERE task_id = ?1", params![task_id], |row| row.get(0))
+            .query_row(
+                "SELECT COUNT(*) FROM task_history WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
             .expect("failed to count history rows");
 
         assert_eq!(status, "requeued");

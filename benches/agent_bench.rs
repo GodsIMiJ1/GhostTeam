@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use criterion::{Criterion, black_box, criterion_group, criterion_main};
 
 #[path = "../src/agent.rs"]
 mod agent;
@@ -54,19 +54,13 @@ struct MockBackend {
 
 impl MockBackend {
     fn new(reply: &str) -> Self {
-        Self {
-            reply: reply.to_string(),
-            prompts: Arc::new(Mutex::new(Vec::new())),
-        }
+        Self { reply: reply.to_string(), prompts: Arc::new(Mutex::new(Vec::new())) }
     }
 }
 
 impl model::ModelBackend for MockBackend {
     fn generate(&self, prompt: &str) -> anyhow::Result<String> {
-        self.prompts
-            .lock()
-            .expect("prompt log poisoned")
-            .push(prompt.to_string());
+        self.prompts.lock().expect("prompt log poisoned").push(prompt.to_string());
         Ok(self.reply.clone())
     }
 }
@@ -83,7 +77,8 @@ fn prepare_workspace() -> (PathBuf, WorkspaceEnv) {
     let root = unique_workspace("agent");
     fs::create_dir_all(root.join("roles")).expect("failed to create roles dir");
     fs::create_dir_all(root.join("teams")).expect("failed to create teams dir");
-    fs::write(root.join("roles").join("worker.md"), "# worker\nWorker role").expect("failed to write role");
+    fs::write(root.join("roles").join("worker.md"), "# worker\nWorker role")
+        .expect("failed to write role");
     (root.clone(), WorkspaceEnv::set(&root))
 }
 
@@ -129,18 +124,12 @@ fn bench_model_backend_calls(c: &mut Criterion) {
     let backend = MockBackend::new("mock reply");
     c.bench_function("mock model backend calls", |b| {
         b.iter(|| {
-            let reply = backend
-                .generate(black_box("benchmark prompt"))
-                .expect("mock backend failed");
+            let reply =
+                backend.generate(black_box("benchmark prompt")).expect("mock backend failed");
             black_box(reply)
         })
     });
 }
 
-criterion_group!(
-    benches,
-    bench_message_polling,
-    bench_task_processing,
-    bench_model_backend_calls
-);
+criterion_group!(benches, bench_message_polling, bench_task_processing, bench_model_backend_calls);
 criterion_main!(benches);

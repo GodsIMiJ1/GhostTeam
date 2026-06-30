@@ -1,5 +1,5 @@
 use anyhow::Result;
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{OptionalExtension, params};
 use std::thread;
 use std::time::Duration;
 
@@ -34,14 +34,14 @@ pub fn join_agent(id: &str, role: &str, backend: &str) -> Result<String> {
 pub fn leave_agent(id: &str) -> Result<()> {
     log::info!("leaving agent id={id}");
     let connection = db::open()?;
-    connection
-        .execute("DELETE FROM agents WHERE id = ?1", params![id])
-        .map_err(|error| {
-            log::error!("failed to delete agent {id}: {error}");
-            error
-        })?;
+    connection.execute("DELETE FROM agents WHERE id = ?1", params![id]).map_err(|error| {
+        log::error!("failed to delete agent {id}: {error}");
+        error
+    })?;
     if konnect::client().is_some() {
-        log::debug!("agent {id} left local workspace; KasperKonnect remains stateful via heartbeat");
+        log::debug!(
+            "agent {id} left local workspace; KasperKonnect remains stateful via heartbeat"
+        );
     }
     log::info!("agent removed id={id}");
     Ok(())
@@ -73,24 +73,23 @@ pub fn list_agents() -> Result<Vec<AgentRow>> {
 pub fn send_message(from: &str, to: &str, message: &str) -> Result<()> {
     log::debug!("sending message from={from} to={to} bytes={}", message.len());
     let connection = db::open()?;
-    connection.execute(
-        "INSERT INTO messages (sender, recipient, body, created_at, read)
+    connection
+        .execute(
+            "INSERT INTO messages (sender, recipient, body, created_at, read)
          VALUES (?1, ?2, ?3, datetime('now'), 0)",
-        params![from, to, message],
-    ).map_err(|error| {
-        log::error!("failed to insert message from {from} to {to}: {error}");
-        error
-    })?;
+            params![from, to, message],
+        )
+        .map_err(|error| {
+            log::error!("failed to insert message from {from} to {to}: {error}");
+            error
+        })?;
     let local_id = connection.last_insert_rowid();
     if let Some(client) = konnect::client() {
         match client.send_message(local_id, from, to, message) {
             Ok(remote_id) => {
-                if let Err(error) = db::record_id_mapping(
-                    "message",
-                    local_id,
-                    &remote_id,
-                    Some(client.base_url()),
-                ) {
+                if let Err(error) =
+                    db::record_id_mapping("message", local_id, &remote_id, Some(client.base_url()))
+                {
                     log::warn!(
                         "failed to persist message mapping local_id={local_id} remote_id={remote_id}: {error}"
                     );
@@ -139,7 +138,11 @@ pub fn run_loop(id: &str, role: &str, backend: &str) -> Result<()> {
     }
 }
 
-pub fn process_inbox_once(id: &str, role: &str, backend: &dyn model::ModelBackend) -> Result<usize> {
+pub fn process_inbox_once(
+    id: &str,
+    role: &str,
+    backend: &dyn model::ModelBackend,
+) -> Result<usize> {
     let role_prompt = roles::load_role(role)?;
     let messages = load_inbox_messages(id)?;
     log::debug!("inbox poll id={id} unread_messages={}", messages.len());
@@ -158,18 +161,20 @@ pub fn process_inbox_once(id: &str, role: &str, backend: &dyn model::ModelBacken
             message.id,
             reply.len()
         );
-        connection.execute(
-            "INSERT INTO messages (sender, recipient, body, created_at, read)
+        connection
+            .execute(
+                "INSERT INTO messages (sender, recipient, body, created_at, read)
              VALUES (?1, ?2, ?3, datetime('now'), 0)",
-            params![id, message.sender, reply],
-        ).map_err(|error| {
-            log::error!(
-                "failed to insert generated reply for message {} from {}: {error}",
-                message.id,
-                message.sender
-            );
-            error
-        })?;
+                params![id, message.sender, reply],
+            )
+            .map_err(|error| {
+                log::error!(
+                    "failed to insert generated reply for message {} from {}: {error}",
+                    message.id,
+                    message.sender
+                );
+                error
+            })?;
         let reply_id = connection.last_insert_rowid();
         if let Some(client) = konnect::client() {
             match client.send_message(reply_id, id, &message.sender, &reply) {
@@ -216,11 +221,7 @@ fn allocate_agent_id(connection: &rusqlite::Connection, requested: &str) -> Resu
 
 fn agent_exists(connection: &rusqlite::Connection, id: &str) -> Result<bool> {
     let exists = connection
-        .query_row(
-            "SELECT 1 FROM agents WHERE id = ?1 LIMIT 1",
-            params![id],
-            |_| Ok(()),
-        )
+        .query_row("SELECT 1 FROM agents WHERE id = ?1 LIMIT 1", params![id], |_| Ok(()))
         .optional()?
         .is_some();
     Ok(exists)
@@ -298,31 +299,33 @@ fn sync_remote_messages(id: &str) -> Result<()> {
             continue;
         }
 
-        connection.execute(
-            "INSERT INTO messages (sender, recipient, body, created_at, read)
+        connection
+            .execute(
+                "INSERT INTO messages (sender, recipient, body, created_at, read)
              VALUES (?1, ?2, ?3, datetime('now'), 0)",
-            params![message.source_env, id, extract_message_body(&message)],
-        ).map_err(|error| {
-            log::error!(
-                "failed to import KasperKonnect message {} for {id}: {error}",
-                message.id
-            );
-            error
-        })?;
+                params![message.source_env, id, extract_message_body(&message)],
+            )
+            .map_err(|error| {
+                log::error!(
+                    "failed to import KasperKonnect message {} for {id}: {error}",
+                    message.id
+                );
+                error
+            })?;
         let local_id = connection.last_insert_rowid();
-        if let Err(error) = db::record_id_mapping(
-            "message",
-            local_id,
-            &message.id,
-            Some(client.base_url()),
-        ) {
+        if let Err(error) =
+            db::record_id_mapping("message", local_id, &message.id, Some(client.base_url()))
+        {
             log::warn!(
                 "failed to persist imported message mapping local_id={local_id} remote_id={}: {error}",
                 message.id
             );
         }
         if let Err(error) = client.acknowledge_message(&message.id, id) {
-            log::warn!("failed to acknowledge KasperKonnect message {} for {id}: {error}", message.id);
+            log::warn!(
+                "failed to acknowledge KasperKonnect message {} for {id}: {error}",
+                message.id
+            );
         }
     }
 
@@ -331,13 +334,12 @@ fn sync_remote_messages(id: &str) -> Result<()> {
 
 fn mark_messages_read(connection: &rusqlite::Connection, messages: &[MessageRow]) -> Result<()> {
     for message in messages {
-        connection.execute(
-            "UPDATE messages SET read = 1 WHERE id = ?1",
-            params![message.id],
-        ).map_err(|error| {
-            log::error!("failed to mark message {} read: {error}", message.id);
-            error
-        })?;
+        connection
+            .execute("UPDATE messages SET read = 1 WHERE id = ?1", params![message.id])
+            .map_err(|error| {
+                log::error!("failed to mark message {} read: {error}", message.id);
+                error
+            })?;
     }
     Ok(())
 }

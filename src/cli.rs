@@ -8,10 +8,7 @@ use std::process::Command;
 use crate::{agent, db, konnect, model::ghostos::GhostOsConfig, tasks};
 
 #[derive(Debug, Parser)]
-#[command(
-    name = "ghostteam",
-    about = "GhostTeam coordination CLI by GodsIMiJ AI Solutions Inc."
-)]
+#[command(name = "ghostteam", about = "GhostTeam coordination CLI by GodsIMiJ AI Solutions Inc.")]
 pub struct Cli {
     /// Start the HTTP API server instead of running a CLI command.
     #[arg(long)]
@@ -168,11 +165,7 @@ pub fn run(cli: Cli) -> Result<()> {
                 );
             }
         }
-        Commands::TaskCreate {
-            from,
-            to,
-            description,
-        } => {
+        Commands::TaskCreate { from, to, description } => {
             let id = tasks::create_task(&from, &to, &description)?;
             println!("Task created: {id}");
         }
@@ -205,10 +198,7 @@ pub fn run(cli: Cli) -> Result<()> {
         }
         Commands::Config => {
             let config = GhostOsConfig::load()?;
-            print!(
-                "{}",
-                serde_yaml::to_string(&config).expect("failed to format GhostOS config")
-            );
+            print!("{}", serde_yaml::to_string(&config).expect("failed to format GhostOS config"));
         }
         Commands::SetConfig { key, value } => {
             let mut config = GhostOsConfig::load()?;
@@ -227,10 +217,8 @@ pub fn run(cli: Cli) -> Result<()> {
             println!("Updated {key}");
         }
         Commands::KonnectStatus => {
-            let registered_ids = agent::list_agents()?
-                .into_iter()
-                .map(|agent| agent.id)
-                .collect::<Vec<_>>();
+            let registered_ids =
+                agent::list_agents()?.into_iter().map(|agent| agent.id).collect::<Vec<_>>();
 
             match konnect::runtime_status(&registered_ids) {
                 Some(status) if status.reachable => {

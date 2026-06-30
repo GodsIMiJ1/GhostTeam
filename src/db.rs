@@ -92,10 +92,7 @@ fn ensure_workspace_dir() -> Result<PathBuf> {
     log::debug!("ensuring workspace directory exists at {}", path.display());
     fs::create_dir_all(&path)
         .map_err(|error| {
-            log::error!(
-                "failed to create workspace directory at {}: {error}",
-                path.display()
-            );
+            log::error!("failed to create workspace directory at {}: {error}", path.display());
             error
         })
         .with_context(|| format!("failed to create workspace directory at {}", path.display()))?;
@@ -213,7 +210,7 @@ pub fn lookup_mapping_by_remote(
                 "failed to lookup mapping kind={entity_kind} remote_id={remote_id}: {error}"
             );
             error
-    })?;
+        })?;
     Ok(mapping)
 }
 
