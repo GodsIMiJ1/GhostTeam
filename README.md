@@ -42,6 +42,8 @@ cd ghostteam
 cargo build
 ```
 
+If a local build leaves `target/` or cache files behind, restore the tree with `git restore target` and delete any `__pycache__` folders before committing.
+
 ### Release build
 
 To build an optimized binary:

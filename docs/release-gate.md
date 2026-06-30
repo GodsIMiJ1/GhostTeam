@@ -50,6 +50,12 @@ Owners are roles, not individuals. Dependencies are explicit. This is ready to d
 8. Add health/readiness endpoints
 9. Tighten release automation
 
+### Repo cleanup note
+
+- Keep generated build output out of commits.
+- If `target/` or cache folders show up after local builds, restore them with `git restore target` and remove any stray `__pycache__` folders.
+- Re-run `git status --short` before committing so the tree is clean.
+
 ### v0.3.0 (Enhancement Release)
 1. Dashboard
 2. Metrics + tracing
