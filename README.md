@@ -2,13 +2,34 @@
 
 GhostTeam is built by GodsIMiJ AI Solutions Inc. and architected by James D. Ingersoll.
 
-License: [MIT](LICENSE)
+License: [Apache-2.0](LICENSE)
 
-GhostTeam is a local-first multi-agent coordination playground written in Rust. It keeps a small SQLite-backed workspace on disk, lets agents join under a role and backend, routes messages between agents, and tracks task handoffs through a simple command-line interface.
+GhostTeam is a local-first multi-agent coordination runtime for orchestrating AI agents, task handoffs, message routing, and operational memory across the GodsIMiJ/KasperOS ecosystem.
+
+It acts as a coordination kernel: a small Rust control plane that keeps state on disk, lets agents join under a role and backend, routes messages between agents, and tracks task handoffs through a simple command-line interface.
 
 It can also mirror agents, messages, and task handoffs into KasperKonnect automatically when the daemon is running locally, or explicitly when you set `GHOSTTEAM_KASPERKONNECT_URL=http://127.0.0.1:4077`.
 
 It also ships with a dedicated dashboard that opens at `/` when the API server is running.
+
+## System Diagram
+
+```mermaid
+flowchart LR
+    U[User] --> T[Telegram]
+    U --> D[Dashboard]
+    T --> A[GhostTeam API]
+    D --> A
+    A --> AG[Agents]
+    A --> TS[Tasks]
+    A --> MS[Messages]
+    AG --> KK[KasperKonnect]
+    TS --> KK
+    MS --> KK
+    KK --> KO[KasperOS]
+    KK --> GO[GhostOS]
+    KK --> OL[Ollama]
+```
 
 ## Overview
 
@@ -23,6 +44,22 @@ The workspace lives in `.ghostteam/`, which holds:
 - `ghostteam.db` for SQLite state
 - `roles/` for role prompt files
 - `teams/` for team definitions
+
+## Quickstart in 60 Seconds
+
+```bash
+git clone https://github.com/GodsIMiJ1/GhostTeam
+cd GhostTeam/ghostteam
+cargo build
+ghostteam init
+ghostteam join manager --role manager --backend ollama
+```
+
+If you want the API and dashboard too, start the server after initialization:
+
+```bash
+ghostteam --api
+```
 
 ## Installation
 
@@ -164,6 +201,18 @@ ghostteam init
 
 This creates `.ghostteam/` and initializes the SQLite schema.
 
+## Branded Role Examples
+
+These role names make demos feel more intentional while still fitting the same runtime:
+
+```bash
+ghostteam join omari --role overseer --backend ollama
+ghostteam join kodii --role engineer --backend ollama
+ghostteam join axiom --role reviewer --backend ghostos
+```
+
+You can keep using the default `manager`, `worker`, and `inspector` roles too.
+
 ## Running Local Models
 
 GhostTeam supports a small backend abstraction with three backend names:
@@ -221,6 +270,21 @@ ghostteam join worker --role worker --backend llamacpp
 ### GhostOS
 
 `ghostos` is currently a placeholder backend that returns a formatted stub response. It is useful for testing the rest of the workflow without a real model runtime.
+
+## Telegram Command Hub
+
+The next flagship demo for GhostTeam should be Telegram-first control and visibility.
+
+The intended command surface is:
+
+- `/agents`
+- `/tasks`
+- `/assign kodii "fix dashboard bug"`
+- `/status`
+- `/logs omari`
+- `/handoff axiom "review this plan"`
+
+That makes Telegram the lightweight front door for dispatch, status checks, and human-in-the-loop oversight while GhostTeam keeps the coordination state.
 
 ## KasperKonnect Integration
 

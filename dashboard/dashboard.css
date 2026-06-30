@@ -533,11 +533,17 @@ button.secondary {
   padding-top: 14px;
 }
 
-.task-inspector-grid {
+.task-inspector-split {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.9fr);
   gap: 14px;
-  margin-bottom: 14px;
+  margin-top: 8px;
+}
+
+.task-inspector-main,
+.task-inspector-side {
+  display: grid;
+  gap: 14px;
 }
 
 .task-detail-actions {
@@ -607,7 +613,16 @@ button.secondary {
 }
 
 .task-json {
-  margin-top: 14px;
+  margin: 0;
+  min-height: 240px;
+}
+
+.task-timeline-empty {
+  min-height: 52px;
+}
+
+.task-timeline-list {
+  align-content: start;
 }
 
 .chart-click-hint {
@@ -731,7 +746,7 @@ button.secondary {
     align-items: flex-start;
   }
 
-  .task-inspector-grid,
+  .task-inspector-split,
   .metrics-grid,
   .charts-grid,
   .hero-status,

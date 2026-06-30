@@ -226,15 +226,16 @@
                   <button id="copyTaskJson" class="secondary" type="button">Copy JSON</button>
                 </div>
               </div>
-              <div class="task-inspector-grid">
-                <div>
+              <div class="task-inspector-split">
+                <div class="task-inspector-main">
                   <div id="taskSnapshot" class="detail-empty">Select a task to inspect details.</div>
+                  <pre id="taskRaw" class="code-block task-json">Select a task to inspect raw JSON.</pre>
                 </div>
-                <div>
-                  <div id="taskTimeline" class="stack-list"></div>
+                <div class="task-inspector-side">
+                  <div class="detail-empty task-timeline-empty">Task history and transitions appear here.</div>
+                  <div id="taskTimeline" class="stack-list task-timeline-list"></div>
                 </div>
               </div>
-              <pre id="taskRaw" class="code-block">Select a task to inspect raw JSON.</pre>
             </div>
           </section>
 
