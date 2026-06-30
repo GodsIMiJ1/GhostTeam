@@ -288,7 +288,7 @@ That makes Telegram the lightweight front door for dispatch, status checks, and 
 
 ## Telegram Bridge Setup
 
-Phase 1 adds a separate Rust Telegram bridge binary that talks to the existing GhostTeam API. It supports `/status` and `/agents` and keeps the Telegram process isolated from the main API service.
+Phase 1 adds a separate Rust Telegram bridge binary that talks to the existing GhostTeam API. It supports `/status`, `/agents`, `/tasks`, `/assign`, `/logs`, and `/handoff` while keeping the Telegram process isolated from the main API service.
 
 ### 1. Create a bot token
 
@@ -306,6 +306,32 @@ LOG_LEVEL=info
 ```
 
 `GHOSTTEAM_API_URL` should point at the running GhostTeam API. If you are using the local API server, `http://127.0.0.1:8080` is a good default.
+
+### Local mock development
+
+The bridge can also run against a mock Telegram API during local development. The integration tests in [`tests/telegram_bridge_tests.rs`](/C:/Users/godsi/ghost_dev/GhostTeam/ghostteam/tests/telegram_bridge_tests.rs) use the same request and response shapes.
+
+Example local setup:
+
+```env
+TELEGRAM_BOT_TOKEN=test-token
+TELEGRAM_API_BASE_URL=http://127.0.0.1:18080
+GHOSTTEAM_API_URL=http://127.0.0.1:8080
+GHOSTTEAM_API_KEY=test-key
+LOG_LEVEL=debug
+```
+
+Then launch the bridge against that mock Telegram endpoint:
+
+```bash
+cargo run --bin ghostteam-telegram
+```
+
+For a quick validation loop, run the bridge integration tests in another terminal:
+
+```bash
+cargo test --test telegram_bridge_tests
+```
 
 ### 3. Run the bridge
 
