@@ -1,8 +1,11 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
+use std::env;
+use std::fs;
+use std::path::PathBuf;
 use std::process::Command;
 
-use crate::{agent, db, model::ghostos::GhostOsConfig, tasks};
+use crate::{agent, db, konnect, model::ghostos::GhostOsConfig, tasks};
 
 #[derive(Debug, Parser)]
 #[command(
@@ -10,12 +13,16 @@ use crate::{agent, db, model::ghostos::GhostOsConfig, tasks};
     about = "GhostTeam coordination CLI by GodsIMiJ AI Solutions Inc."
 )]
 pub struct Cli {
+    /// Start the HTTP API server instead of running a CLI command.
+    #[arg(long)]
+    pub api: bool,
+
     #[command(subcommand)]
-    command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Debug, Subcommand)]
-enum Commands {
+pub enum Commands {
     Version,
     Init,
     Join {
@@ -67,13 +74,54 @@ enum Commands {
         key: String,
         value: String,
     },
+    #[command(name = "konnect-status")]
+    KonnectStatus,
+    #[command(name = "konnect-mappings")]
+    KonnectMappings,
+    #[command(name = "konnect-replay")]
+    KonnectReplay {
+        #[arg(long)]
+        json: bool,
+    },
+    #[command(name = "konnect-export")]
+    KonnectExport {
+        #[arg(long)]
+        json: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
     Bench,
+    ApiDocs,
 }
 
-pub fn run() -> Result<()> {
-    let cli = Cli::parse();
+fn render_mapping_history(history: &[db::IdMappingHistoryRow], json: bool) -> Result<String> {
+    if json {
+        Ok(serde_json::to_string_pretty(history).expect("failed to serialize mapping history"))
+    } else if history.is_empty() {
+        Ok("No KasperKonnect mapping history recorded yet".to_string())
+    } else {
+        let mut output = String::new();
+        for entry in history {
+            output.push_str(&format!(
+                "{}\t{}\t{}\t{}\t{}\t{}\n",
+                entry.recorded_at.clone().unwrap_or_default(),
+                entry.entity_kind,
+                entry.local_id,
+                entry.remote_id,
+                entry.remote_source.clone().unwrap_or_default(),
+                entry.action
+            ));
+        }
+        Ok(output)
+    }
+}
 
-    match cli.command {
+pub fn run(cli: Cli) -> Result<()> {
+    let Some(command) = cli.command else {
+        return Ok(());
+    };
+
+    match command {
         Commands::Version => {
             println!("{}", env!("CARGO_PKG_VERSION"));
         }
@@ -177,11 +225,98 @@ pub fn run() -> Result<()> {
             config.save()?;
             println!("Updated {key}");
         }
+        Commands::KonnectStatus => {
+            let registered_ids = agent::list_agents()?
+                .into_iter()
+                .map(|agent| agent.id)
+                .collect::<Vec<_>>();
+
+            match konnect::runtime_status(&registered_ids) {
+                Some(status) if status.reachable => {
+                    if let Some(health) = status.health {
+                        println!(
+                            "KasperKonnect: reachable\tservice={}\tversion={}\tbind={}",
+                            health.service, health.version, health.bind
+                        );
+                    } else {
+                        println!("KasperKonnect: reachable");
+                    }
+
+                    println!("Base URL: {}", status.base_url);
+                    println!("Daemon environments: {}", status.environments.len());
+                    println!("GhostTeam registrations: {}", status.registered.len());
+
+                    if status.registered.is_empty() {
+                        println!("GhostTeam registration visibility: none found");
+                    } else {
+                        println!("GhostTeam registration visibility:");
+                        for environment in status.registered {
+                            println!(
+                                "{}\t{}\t{}\t{}",
+                                environment.id,
+                                environment.display_name,
+                                environment.kind,
+                                environment.status
+                            );
+                        }
+                    }
+                }
+                Some(status) => {
+                    println!("KasperKonnect: unreachable\tbase_url={}", status.base_url);
+                    println!(
+                        "GhostTeam registration visibility: unavailable while daemon is offline"
+                    );
+                }
+                None => {
+                    println!("KasperKonnect: not configured");
+                    println!(
+                        "Set GHOSTTEAM_KASPERKONNECT_URL or start the daemon locally to enable mirroring"
+                    );
+                }
+            }
+        }
+        Commands::KonnectMappings => {
+            let mappings = db::list_id_mappings()?;
+            if mappings.is_empty() {
+                println!("No KasperKonnect ID mappings recorded yet");
+            } else {
+                for mapping in mappings {
+                    println!(
+                        "{}\t{}\t{}\t{}\t{}\t{}",
+                        mapping.entity_kind,
+                        mapping.local_id,
+                        mapping.remote_id,
+                        mapping.remote_source.unwrap_or_default(),
+                        mapping.created_at.unwrap_or_default(),
+                        mapping.updated_at.unwrap_or_default()
+                    );
+                }
+            }
+        }
+        Commands::KonnectReplay { json } => {
+            let history = db::list_id_mapping_history()?;
+            print!("{}", render_mapping_history(&history, json)?);
+        }
+        Commands::KonnectExport { json, output } => {
+            let history = db::list_id_mapping_history()?;
+            let rendered = render_mapping_history(&history, json)?;
+
+            if let Some(path) = output {
+                fs::write(&path, rendered.as_bytes())?;
+                println!("Exported KasperKonnect mapping history to {}", path.display());
+            } else {
+                print!("{}", rendered);
+            }
+        }
         Commands::Bench => {
             let status = Command::new("cargo").arg("bench").status()?;
             if !status.success() {
                 anyhow::bail!("cargo bench failed with status {status}");
             }
+        }
+        Commands::ApiDocs => {
+            let path = env::current_dir()?.join("openapi.yaml");
+            println!("{}", path.display());
         }
     }
 

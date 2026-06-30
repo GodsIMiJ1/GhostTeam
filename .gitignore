@@ -16,6 +16,8 @@ Thumbs.db
 *.tmp
 *.swp
 *.swo
+*.pyc
+__pycache__/
 
 # Local environment overrides
 .env

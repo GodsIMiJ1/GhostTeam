@@ -32,3 +32,25 @@ CREATE TABLE IF NOT EXISTS task_history (
     actor TEXT,
     at DATETIME
 );
+
+CREATE TABLE IF NOT EXISTS konnect_id_mappings (
+    id INTEGER PRIMARY KEY,
+    entity_kind TEXT NOT NULL,
+    local_id TEXT NOT NULL,
+    remote_id TEXT NOT NULL,
+    remote_source TEXT,
+    created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(entity_kind, local_id),
+    UNIQUE(entity_kind, remote_id)
+);
+
+CREATE TABLE IF NOT EXISTS konnect_id_mapping_history (
+    id INTEGER PRIMARY KEY,
+    entity_kind TEXT NOT NULL,
+    local_id TEXT NOT NULL,
+    remote_id TEXT NOT NULL,
+    remote_source TEXT,
+    action TEXT NOT NULL,
+    recorded_at DATETIME NOT NULL DEFAULT (datetime('now'))
+);

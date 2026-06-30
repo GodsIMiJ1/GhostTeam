@@ -6,6 +6,8 @@ License: [MIT](LICENSE)
 
 GhostTeam is a local-first multi-agent coordination playground written in Rust. It keeps a small SQLite-backed workspace on disk, lets agents join under a role and backend, routes messages between agents, and tracks task handoffs through a simple command-line interface.
 
+It can also mirror agents, messages, and task handoffs into KasperKonnect automatically when the daemon is running locally, or explicitly when you set `GHOSTTEAM_KASPERKONNECT_URL=http://127.0.0.1:4077`.
+
 ## Overview
 
 GhostTeam is built around three core ideas:
@@ -82,6 +84,68 @@ Or run the uninstall script:
 
 The uninstall script removes `/usr/local/bin/ghostteam` and then asks whether you want to delete `~/.ghostteam`.
 
+### Docker deployment
+
+Build and run the GhostTeam API container on port `8080`:
+
+```bash
+docker compose up --build ghostteam-api
+```
+
+This starts the API server and mounts a persistent GhostTeam workspace volume.
+
+You can override deployment settings with environment variables or a `.env` file:
+
+- `GHOSTTEAM_API_PORT` defaults to `8080`
+- `GHOSTTEAM_GHOSTOS_ENDPOINT` defaults to `http://ghostos:9000/infer`
+- `GHOSTTEAM_GHOSTOS_MODEL` defaults to `ghost-1`
+
+Example `.env`:
+
+```env
+GHOSTTEAM_API_PORT=8080
+GHOSTTEAM_GHOSTOS_ENDPOINT=http://ghostos:9000/infer
+GHOSTTEAM_GHOSTOS_MODEL=ghost-1
+```
+
+The compose file also includes:
+
+- `ghostos-bridge`, a small `/infer` forwarding bridge on port `9000`
+- `ghostos-real`, the actual GhostOS runtime container on port `8501`
+- `ollama`, an optional profile you can enable with `--profile ollama`
+
+To start the default bridge plus real GhostOS runtime alongside the API:
+
+```bash
+docker compose up --build
+```
+
+To include Ollama:
+
+```bash
+docker compose --profile ollama up --build
+```
+
+The bridge forwards `POST /infer` requests to the real GhostOS runtime, so the API can keep using a normal `http://ghostos-bridge:9000/infer` endpoint.
+
+If you want to override the upstream runtime target, set:
+
+```env
+GHOSTOS_UPSTREAM_URL=http://ghostos-real:8501/infer
+```
+
+To run just the real GhostOS runtime container:
+
+```bash
+docker compose up --build ghostos-real
+```
+
+The `ghostos-real` container installs the official `ghostos` package and launches its web runtime. If you want GhostTeam to talk to another GhostOS deployment directly, point `GHOSTTEAM_GHOSTOS_ENDPOINT` at a compatible `/infer` adapter for that deployment.
+
+When running in Docker, the API listens on `8080` by default, so the OpenAPI and client base URLs should point to `http://localhost:8080`.
+
+The GhostOS config inside the container is read from `.ghostteam/config.yaml`, but the Docker image and compose stack also honor `GHOSTTEAM_GHOSTOS_ENDPOINT` and `GHOSTTEAM_GHOSTOS_MODEL` for deployment overrides.
+
 ### Initialize the workspace
 
 Before running agents or tasks, initialize the local workspace:
@@ -149,6 +213,26 @@ ghostteam join worker --role worker --backend llamacpp
 ### GhostOS
 
 `ghostos` is currently a placeholder backend that returns a formatted stub response. It is useful for testing the rest of the workflow without a real model runtime.
+
+## KasperKonnect Integration
+
+GhostTeam can announce joined agents to KasperKonnect, mirror messages into the daemon, and forward task handoffs when the runtime fabric is available.
+
+Enable it with:
+
+```env
+GHOSTTEAM_KASPERKONNECT_URL=http://127.0.0.1:4077
+```
+
+When enabled, GhostTeam will:
+
+- register agents as KasperKonnect environments on join
+- heartbeat joined agents while their loops are running
+- mirror sent messages into the daemon
+- import daemon messages into the local inbox when the local queue is empty
+- mirror task create/ack/complete transitions into KasperKonnect
+
+GhostTeam currently uses deterministic mirrored IDs for messages and task handoffs, so we do not need a separate durable mapping table yet. If we later need replay-safe reconciliation across restarts or multiple transports, that would be the point to add one.
 
 ## Commands
 
@@ -285,6 +369,7 @@ If the session already exists, the script exits without creating a duplicate ses
 - `src/` contains the Rust binary crate
 - `.ghostteam/` contains role and team configuration
 - `scripts/` contains helper scripts
+- `docs/release-gate.md` contains the v0.2.0 hardening checklist
 
 ---
 

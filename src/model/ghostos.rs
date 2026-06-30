@@ -35,18 +35,31 @@ impl Default for GhostOsConfig {
 impl GhostOsConfig {
     pub fn load() -> Result<Self> {
         let path = config_path();
-        if !path.exists() {
+        let mut config = if path.exists() {
+            let contents = fs::read_to_string(&path).with_context(|| {
+                format!("failed to read GhostOS config at {}", path.display())
+            })?;
+            serde_yaml::from_str(&contents).with_context(|| {
+                format!("failed to parse GhostOS config at {}", path.display())
+            })?
+        } else {
             log::info!(
                 "ghostos config not found at {}, using defaults",
                 path.display()
             );
-            return Ok(Self::default());
+            Self::default()
+        };
+
+        if let Ok(endpoint) = env::var("GHOSTTEAM_GHOSTOS_ENDPOINT") {
+            log::debug!("ghostos endpoint overridden from environment");
+            config.ghostos_endpoint = endpoint;
         }
 
-        let contents = fs::read_to_string(&path)
-            .with_context(|| format!("failed to read GhostOS config at {}", path.display()))?;
-        let config = serde_yaml::from_str(&contents)
-            .with_context(|| format!("failed to parse GhostOS config at {}", path.display()))?;
+        if let Ok(model) = env::var("GHOSTTEAM_GHOSTOS_MODEL") {
+            log::debug!("ghostos model overridden from environment");
+            config.ghostos_model = model;
+        }
+
         Ok(config)
     }
 

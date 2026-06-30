@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::db::{self, MessageRow, TaskRow};
+use crate::konnect;
 
 pub fn send_message(from: &str, to: &str, body: &str) -> Result<()> {
     log::debug!("task-layer send_message from={from} to={to} bytes={}", body.len());
@@ -16,6 +17,26 @@ pub fn send_message(from: &str, to: &str, body: &str) -> Result<()> {
         log::error!("failed to insert message from {from} to {to}: {error}");
         error
     })?;
+    let local_id = connection.last_insert_rowid();
+    if let Some(client) = konnect::client() {
+        match client.send_message(local_id, from, to, body) {
+            Ok(remote_id) => {
+                if let Err(error) = db::record_id_mapping(
+                    "message",
+                    local_id,
+                    &remote_id,
+                    Some(client.base_url()),
+                ) {
+                    log::warn!(
+                        "failed to persist message mapping local_id={local_id} remote_id={remote_id}: {error}"
+                    );
+                }
+            }
+            Err(error) => {
+                log::warn!("failed to mirror message {local_id} to KasperKonnect: {error}");
+            }
+        }
+    }
     Ok(())
 }
 
@@ -60,6 +81,25 @@ pub fn create_task(from: &str, to: &str, description: &str) -> Result<i64> {
     })?;
     let task_id = connection.last_insert_rowid();
     insert_history(&connection, task_id, "created", from)?;
+    if let Some(client) = konnect::client() {
+        match client.create_task_handoff(task_id, from, to, description) {
+            Ok(remote_id) => {
+                if let Err(error) = db::record_id_mapping(
+                    "task",
+                    task_id,
+                    &remote_id,
+                    Some(client.base_url()),
+                ) {
+                    log::warn!(
+                        "failed to persist task mapping local_id={task_id} remote_id={remote_id}: {error}"
+                    );
+                }
+            }
+            Err(error) => {
+                log::warn!("failed to mirror task {task_id} to KasperKonnect: {error}");
+            }
+        }
+    }
     log::debug!("task created id={task_id} creator={from} assignee={to}");
     Ok(task_id)
 }
@@ -77,6 +117,14 @@ pub fn ack_task(id: i64, worker: &str) -> Result<()> {
         error
     })?;
     insert_history(&connection, id, "acked", worker)?;
+    if let Some(client) = konnect::client() {
+        let remote_id = db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
+        if let Err(error) = client.acknowledge_task_handoff(id, worker) {
+            log::warn!(
+                "failed to mirror ack for task {id} (remote={remote_id}) to KasperKonnect: {error}"
+            );
+        }
+    }
     log::debug!("task transitioned id={id} status=acked worker={worker}");
     Ok(())
 }
@@ -94,6 +142,14 @@ pub fn complete_task(id: i64, worker: &str, result: &str) -> Result<()> {
         error
     })?;
     insert_history(&connection, id, "completed", worker)?;
+    if let Some(client) = konnect::client() {
+        let remote_id = db::lookup_remote_id("task", id)?.unwrap_or_else(|| konnect::remote_task_id(id));
+        if let Err(error) = client.complete_task_handoff(id, worker) {
+            log::warn!(
+                "failed to mirror completion for task {id} (remote={remote_id}) to KasperKonnect: {error}"
+            );
+        }
+    }
     log::debug!("task transitioned id={id} status=completed worker={worker}");
     Ok(())
 }
@@ -111,6 +167,9 @@ pub fn requeue_task(id: i64) -> Result<()> {
         error
     })?;
     insert_history(&connection, id, "requeued", "system")?;
+    if konnect::client().is_some() {
+        log::debug!("task {id} requeued locally; KasperKonnect has no dedicated requeue route");
+    }
     log::debug!("task transitioned id={id} status=requeued");
     Ok(())
 }

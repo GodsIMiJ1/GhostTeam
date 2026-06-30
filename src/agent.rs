@@ -4,6 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use crate::db::{self, AgentRow, MessageRow};
+use crate::konnect;
 use crate::model::{self, BackendKind};
 use crate::roles;
 
@@ -21,6 +22,11 @@ pub fn join_agent(id: &str, role: &str, backend: &str) -> Result<String> {
         log::error!("failed to insert agent {final_id}: {error}");
         error
     })?;
+    if let Some(client) = konnect::client() {
+        if let Err(error) = client.register_environment(&final_id, role, backend) {
+            log::warn!("failed to register agent {final_id} with KasperKonnect: {error}");
+        }
+    }
     log::info!("agent joined id={final_id} role={role} backend={backend}");
     Ok(final_id)
 }
@@ -34,6 +40,9 @@ pub fn leave_agent(id: &str) -> Result<()> {
             log::error!("failed to delete agent {id}: {error}");
             error
         })?;
+    if konnect::client().is_some() {
+        log::debug!("agent {id} left local workspace; KasperKonnect remains stateful via heartbeat");
+    }
     log::info!("agent removed id={id}");
     Ok(())
 }
@@ -72,26 +81,36 @@ pub fn send_message(from: &str, to: &str, message: &str) -> Result<()> {
         log::error!("failed to insert message from {from} to {to}: {error}");
         error
     })?;
+    let local_id = connection.last_insert_rowid();
+    if let Some(client) = konnect::client() {
+        match client.send_message(local_id, from, to, message) {
+            Ok(remote_id) => {
+                if let Err(error) = db::record_id_mapping(
+                    "message",
+                    local_id,
+                    &remote_id,
+                    Some(client.base_url()),
+                ) {
+                    log::warn!(
+                        "failed to persist message mapping local_id={local_id} remote_id={remote_id}: {error}"
+                    );
+                }
+            }
+            Err(error) => {
+                log::warn!("failed to mirror message {local_id} to KasperKonnect: {error}");
+            }
+        }
+    }
     Ok(())
 }
 
 pub fn receive_messages(id: &str, wait: bool) -> Result<Vec<MessageRow>> {
     loop {
-        let connection = db::open()?;
-        let messages = unread_messages(&connection, id)?;
+        let messages = load_inbox_messages(id)?;
         log::debug!("message polling id={id} unread={}", messages.len());
 
         if !messages.is_empty() {
-            for message in &messages {
-                log::debug!(
-                    "message read id={} from={} to={} bytes={}",
-                    message.id,
-                    message.sender,
-                    message.recipient,
-                    message.body.len()
-                );
-            }
-            mark_messages_read(&connection, &messages)?;
+            log_received_messages(&messages);
             return Ok(messages);
         }
 
@@ -111,15 +130,20 @@ pub fn run_loop(id: &str, role: &str, backend: &str) -> Result<()> {
     loop {
         log::debug!("polling inbox id={id} role={role}");
         process_inbox_once(id, role, backend.as_ref())?;
+        if let Some(client) = konnect::client() {
+            if let Err(error) = client.heartbeat(id) {
+                log::debug!("failed to heartbeat KasperKonnect for {id}: {error}");
+            }
+        }
         thread::sleep(Duration::from_millis(500));
     }
 }
 
 pub fn process_inbox_once(id: &str, role: &str, backend: &dyn model::ModelBackend) -> Result<usize> {
-    let connection = db::open()?;
     let role_prompt = roles::load_role(role)?;
-    let messages = unread_messages(&connection, id)?;
+    let messages = load_inbox_messages(id)?;
     log::debug!("inbox poll id={id} unread_messages={}", messages.len());
+    let connection = db::open()?;
 
     for message in &messages {
         let prompt = build_prompt(&role_prompt, id, message);
@@ -146,6 +170,29 @@ pub fn process_inbox_once(id: &str, role: &str, backend: &dyn model::ModelBacken
             );
             error
         })?;
+        let reply_id = connection.last_insert_rowid();
+        if let Some(client) = konnect::client() {
+            match client.send_message(reply_id, id, &message.sender, &reply) {
+                Ok(remote_id) => {
+                    if let Err(error) = db::record_id_mapping(
+                        "message",
+                        reply_id,
+                        &remote_id,
+                        Some(client.base_url()),
+                    ) {
+                        log::warn!(
+                            "failed to persist reply mapping local_id={reply_id} remote_id={remote_id}: {error}"
+                        );
+                    }
+                }
+                Err(error) => {
+                    log::warn!(
+                        "failed to mirror reply {reply_id} from {id} to {}: {error}",
+                        message.sender
+                    );
+                }
+            }
+        }
     }
 
     if !messages.is_empty() {
@@ -204,6 +251,84 @@ fn unread_messages(connection: &rusqlite::Connection, recipient: &str) -> Result
     Ok(messages)
 }
 
+fn load_inbox_messages(id: &str) -> Result<Vec<MessageRow>> {
+    let connection = db::open()?;
+    let mut messages = unread_messages(&connection, id)?;
+
+    if messages.is_empty() {
+        sync_remote_messages(id)?;
+        let refreshed = db::open()?;
+        messages = unread_messages(&refreshed, id)?;
+    }
+
+    Ok(messages)
+}
+
+fn sync_remote_messages(id: &str) -> Result<()> {
+    let Some(client) = konnect::client() else {
+        return Ok(());
+    };
+
+    let messages = match client.poll_messages(id) {
+        Ok(messages) => messages,
+        Err(error) => {
+            log::debug!("kasperkonnect poll failed for {id}: {error}");
+            return Ok(());
+        }
+    };
+
+    if messages.is_empty() {
+        return Ok(());
+    }
+
+    let connection = db::open()?;
+    for message in messages {
+        if let Some(mapping) = db::lookup_mapping_by_remote("message", &message.id)? {
+            log::debug!(
+                "skipping already imported KasperKonnect message {} mapped to local {} for {id}",
+                mapping.remote_id,
+                mapping.local_id
+            );
+            if let Err(error) = client.acknowledge_message(&message.id, id) {
+                log::warn!(
+                    "failed to acknowledge already-mapped KasperKonnect message {} for {id}: {error}",
+                    message.id
+                );
+            }
+            continue;
+        }
+
+        connection.execute(
+            "INSERT INTO messages (sender, recipient, body, created_at, read)
+             VALUES (?1, ?2, ?3, datetime('now'), 0)",
+            params![message.source_env, id, extract_message_body(&message)],
+        ).map_err(|error| {
+            log::error!(
+                "failed to import KasperKonnect message {} for {id}: {error}",
+                message.id
+            );
+            error
+        })?;
+        let local_id = connection.last_insert_rowid();
+        if let Err(error) = db::record_id_mapping(
+            "message",
+            local_id,
+            &message.id,
+            Some(client.base_url()),
+        ) {
+            log::warn!(
+                "failed to persist imported message mapping local_id={local_id} remote_id={}: {error}",
+                message.id
+            );
+        }
+        if let Err(error) = client.acknowledge_message(&message.id, id) {
+            log::warn!("failed to acknowledge KasperKonnect message {} for {id}: {error}", message.id);
+        }
+    }
+
+    Ok(())
+}
+
 fn mark_messages_read(connection: &rusqlite::Connection, messages: &[MessageRow]) -> Result<()> {
     for message in messages {
         connection.execute(
@@ -215,6 +340,30 @@ fn mark_messages_read(connection: &rusqlite::Connection, messages: &[MessageRow]
         })?;
     }
     Ok(())
+}
+
+fn log_received_messages(messages: &[MessageRow]) {
+    for message in messages {
+        log::debug!(
+            "message read id={} from={} to={} bytes={}",
+            message.id,
+            message.sender,
+            message.recipient,
+            message.body.len()
+        );
+    }
+}
+
+fn extract_message_body(message: &konnect::MessageEnvelope) -> String {
+    message
+        .payload
+        .get("body")
+        .and_then(|value| value.as_str())
+        .or_else(|| message.payload.get("prompt").and_then(|value| value.as_str()))
+        .or_else(|| message.payload.get("message").and_then(|value| value.as_str()))
+        .or_else(|| message.payload.get("text").and_then(|value| value.as_str()))
+        .unwrap_or_default()
+        .to_string()
 }
 
 fn build_prompt(role_prompt: &str, agent_id: &str, message: &MessageRow) -> String {
